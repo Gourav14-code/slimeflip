@@ -125,7 +125,11 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            pointer-events: auto !important;
+            touch-action: manipulation !important;
             cursor: pointer;
+            z-index: 5010;
+            position: relative;
             box-shadow: 0 0 30px rgba(56, 239, 125, 0.6), 0 0 60px rgba(0, 242, 254, 0.35);
             animation: pulsePlayBtn 2.2s ease-in-out infinite alternate;
             outline: none;
@@ -492,9 +496,9 @@
             <h1 class="game-title">SLIME FLIP</h1>
             <p class="game-subtitle">GRAVITY PLATFORMER</p>
 
-            <button id="btn-play" class="btn-play-round" aria-label="Play Game">
-                <span class="play-icon">▶</span>
-                <span class="play-label">PLAY</span>
+            <button id="btn-play" class="btn-play-round" aria-label="Play Game" onclick="if(window.UIManager) window.UIManager.openLevelSelect();">
+                <span class="play-icon" style="pointer-events: none;">▶</span>
+                <span class="play-label" style="pointer-events: none;">PLAY</span>
             </button>
 
             <p class="game-hints">Controls: Arrow Keys / A-D + SPACE / W | Touch Controls</p>
@@ -503,7 +507,7 @@
         <!-- PART 2: LEVEL SELECT SCREEN -->
         <div id="screen-level-select" class="overlay-panel" style="display: none;">
             <div class="level-select-header">
-                <button id="btn-back-to-start" class="btn-secondary">‹ BACK</button>
+                <button id="btn-back-to-start" class="btn-secondary" onclick="if(window.UIManager) window.UIManager.openStartScreen();">‹ BACK</button>
                 <h2 class="level-select-title">SELECT LEVEL</h2>
                 <div style="width: 70px;"></div> <!-- visual spacer -->
             </div>

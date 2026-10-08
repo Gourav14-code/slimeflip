@@ -363,29 +363,49 @@ const GameStorage = {
 // DOM UI Manager (Start Screen, Level Select Grid, Level Complete Modal)
 // ============================================================================
 const UIManager = {
+    initialized: false,
+    pendingLevelIndex: undefined,
+
     init(gameScene) {
-        this.scene = gameScene;
+        if (gameScene) {
+            this.scene = gameScene;
+            if (this.pendingLevelIndex !== undefined) {
+                const idx = this.pendingLevelIndex;
+                this.pendingLevelIndex = undefined;
+                this.scene.startLevelFromMenu(idx);
+            }
+        }
+
         this.overlay = document.getElementById('ui-overlay');
         this.screenStart = document.getElementById('screen-start');
         this.screenLevelSelect = document.getElementById('screen-level-select');
         this.screenLevelComplete = document.getElementById('screen-level-complete');
         this.levelsGrid = document.getElementById('levels-grid');
 
+        if (this.initialized) return;
+        this.initialized = true;
+
         const btnPlay = document.getElementById('btn-play');
         if (btnPlay) {
-            btnPlay.addEventListener('click', () => {
+            const onPlay = (e) => {
+                if (e) e.stopPropagation();
                 soundManager.init();
                 soundManager.playClick();
                 this.openLevelSelect();
-            });
+            };
+            btnPlay.addEventListener('click', onPlay);
+            btnPlay.addEventListener('pointerdown', onPlay);
         }
 
         const btnBack = document.getElementById('btn-back-to-start');
         if (btnBack) {
-            btnBack.addEventListener('click', () => {
+            const onBack = (e) => {
+                if (e) e.stopPropagation();
                 soundManager.playClick();
                 this.openStartScreen();
-            });
+            };
+            btnBack.addEventListener('click', onBack);
+            btnBack.addEventListener('pointerdown', onBack);
         }
 
         const btnReplay = document.getElementById('btn-replay');
@@ -393,7 +413,7 @@ const UIManager = {
             btnReplay.addEventListener('click', () => {
                 soundManager.playClick();
                 this.hideOverlay();
-                this.scene.restartCurrentLevel();
+                if (this.scene) this.scene.restartCurrentLevel();
             });
         }
 
@@ -402,9 +422,9 @@ const UIManager = {
             btnNext.addEventListener('click', () => {
                 soundManager.playClick();
                 this.hideOverlay();
-                const nextIndex = this.scene.currentLevelIndex + 1;
+                const nextIndex = (this.scene ? this.scene.currentLevelIndex : 0) + 1;
                 if (nextIndex < GAME_LEVELS.length) {
-                    this.scene.startLevelFromMenu(nextIndex);
+                    if (this.scene) this.scene.startLevelFromMenu(nextIndex);
                 } else {
                     this.openLevelSelect();
                 }
@@ -421,36 +441,60 @@ const UIManager = {
     },
 
     showScreen(panelName) {
-        if (!this.overlay) return;
-        this.overlay.style.display = 'flex';
+        if (!this.overlay) this.overlay = document.getElementById('ui-overlay');
+        if (this.overlay) this.overlay.style.display = 'flex';
+        if (!this.screenStart) this.screenStart = document.getElementById('screen-start');
+        if (!this.screenLevelSelect) this.screenLevelSelect = document.getElementById('screen-level-select');
+        if (!this.screenLevelComplete) this.screenLevelComplete = document.getElementById('screen-level-complete');
+
         if (this.screenStart) this.screenStart.style.display = (panelName === 'start') ? 'flex' : 'none';
         if (this.screenLevelSelect) this.screenLevelSelect.style.display = (panelName === 'select') ? 'flex' : 'none';
         if (this.screenLevelComplete) this.screenLevelComplete.style.display = (panelName === 'complete') ? 'flex' : 'none';
     },
 
     hideOverlay() {
+        if (!this.overlay) this.overlay = document.getElementById('ui-overlay');
         if (this.overlay) this.overlay.style.display = 'none';
-        if (this.scene && this.scene.scene.isPaused()) {
-            this.scene.scene.resume();
+        try {
+            if (this.scene && this.scene.scene && typeof this.scene.scene.isPaused === 'function') {
+                if (this.scene.scene.isPaused()) {
+                    this.scene.scene.resume();
+                }
+            }
+        } catch (e) {
+            console.warn('Resume fallback:', e);
         }
     },
 
     openStartScreen() {
         this.showScreen('start');
-        if (this.scene && !this.scene.scene.isPaused()) {
-            this.scene.scene.pause();
+        try {
+            if (this.scene && this.scene.scene && typeof this.scene.scene.isPaused === 'function') {
+                if (!this.scene.scene.isPaused()) {
+                    this.scene.scene.pause();
+                }
+            }
+        } catch (e) {
+            console.warn('Pause fallback:', e);
         }
     },
 
     openLevelSelect() {
         this.renderLevelsGrid();
         this.showScreen('select');
-        if (this.scene && !this.scene.scene.isPaused()) {
-            this.scene.scene.pause();
+        try {
+            if (this.scene && this.scene.scene && typeof this.scene.scene.isPaused === 'function') {
+                if (!this.scene.scene.isPaused()) {
+                    this.scene.scene.pause();
+                }
+            }
+        } catch (e) {
+            console.warn('Pause fallback:', e);
         }
     },
 
     renderLevelsGrid() {
+        if (!this.levelsGrid) this.levelsGrid = document.getElementById('levels-grid');
         if (!this.levelsGrid) return;
         this.levelsGrid.innerHTML = '';
 
@@ -479,11 +523,18 @@ const UIManager = {
             card.innerHTML = `${badge}${numDisplay}${name}${starsHtml}`;
 
             if (isUnlocked) {
-                card.addEventListener('click', () => {
+                const onSelect = (e) => {
+                    if (e) e.stopPropagation();
                     soundManager.playClick();
                     this.hideOverlay();
-                    this.scene.startLevelFromMenu(idx);
-                });
+                    if (this.scene) {
+                        this.scene.startLevelFromMenu(idx);
+                    } else {
+                        this.pendingLevelIndex = idx;
+                    }
+                };
+                card.addEventListener('click', onSelect);
+                card.addEventListener('pointerdown', onSelect);
             }
 
             this.levelsGrid.appendChild(card);
@@ -2759,5 +2810,9 @@ const gameConfig = {
 };
 
 window.addEventListener('DOMContentLoaded', () => {
+    if (window.UIManager) {
+        window.UIManager.init();
+    }
     window.game = new Phaser.Game(gameConfig);
 });
+
