@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Viewport optimized for mobile and Capacitor Android apps -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0d1a">
+    <title>Slime Flip - Gravity Platformer</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #070913;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            touch-action: none; /* Prevents unwanted browser pinch-zoom & gestures */
+        }
+
+        #game-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            margin: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+        }
+
+        /* ====================================================================
+           DOM UI OVERLAYS (START SCREEN, LEVEL SELECT, LEVEL COMPLETE)
+           - Compatible with Capacitor Android WebView (dark fallback + blur)
+           ==================================================================== */
+        #ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(7, 9, 19, 0.88); /* Fallback for Android WebView */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: opacity 0.25s ease;
+        }
+
+        .overlay-panel {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        /* ---------------- PART 1: START SCREEN ---------------- */
+        .logo-wrap {
+            margin-bottom: 8px;
+        }
+
+        .game-logo {
+            width: clamp(64px, 12vw, 96px);
+            height: clamp(64px, 12vw, 96px);
+            border-radius: 24px;
+            box-shadow: 0 0 25px rgba(56, 239, 125, 0.5);
+            animation: floatLogo 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes floatLogo {
+            0% { transform: translateY(0px); }
+            100% { transform: translateY(-8px); }
+        }
+
+        .game-title {
+            font-size: clamp(32px, 6.5vw, 56px);
+            font-weight: 900;
+            letter-spacing: 4px;
+            background: linear-gradient(135deg, #38ef7d 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 35px rgba(56, 239, 125, 0.4);
+            margin-bottom: 2px;
+        }
+
+        .game-subtitle {
+            font-size: clamp(12px, 2vw, 15px);
+            font-weight: 700;
+            letter-spacing: 6px;
+            color: #94a3b8;
+            margin-bottom: 26px;
+        }
+
+        /* Big, round, glowing PLAY button with gentle pulse */
+        .btn-play-round {
+            width: clamp(110px, 16vw, 140px);
+            height: clamp(110px, 16vw, 140px);
+            border-radius: 50%;
+            border: 3.5px solid #70e0a0;
+            background: radial-gradient(circle at 35% 35%, #38ef7d, #059669);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 0 30px rgba(56, 239, 125, 0.6), 0 0 60px rgba(0, 242, 254, 0.35);
+            animation: pulsePlayBtn 2.2s ease-in-out infinite alternate;
+            outline: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.15s ease;
+        }
+
+        .btn-play-round:active {
+            transform: scale(0.92) !important;
+        }
+
+        .play-icon {
+            font-size: clamp(28px, 4.5vw, 36px);
+            margin-bottom: -3px;
+            margin-left: 4px; /* visually centers play triangle */
+        }
+
+        .play-label {
+            font-size: clamp(13px, 2vw, 16px);
+            font-weight: 900;
+            letter-spacing: 2px;
+        }
+
+        @keyframes pulsePlayBtn {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 24px rgba(56, 239, 125, 0.5), 0 0 45px rgba(0, 242, 254, 0.25);
+            }
+            100% {
+                transform: scale(1.08);
+                box-shadow: 0 0 45px rgba(56, 239, 125, 0.9), 0 0 80px rgba(0, 242, 254, 0.5);
+            }
+        }
+
+        .game-hints {
+            margin-top: 24px;
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        /* ---------------- PART 2: LEVEL SELECT SCREEN ---------------- */
+        .level-select-header {
+            width: 100%;
+            max-width: 1080px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+
+        .level-select-title {
+            font-size: clamp(22px, 3.5vw, 32px);
+            font-weight: 900;
+            letter-spacing: 3px;
+            color: #ffffff;
+            text-shadow: 0 0 20px rgba(56, 239, 125, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(30, 41, 59, 0.85);
+            color: #e2e8f0;
+            border: 1.5px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.15s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(51, 65, 85, 0.9);
+            border-color: #38ef7d;
+        }
+
+        .btn-secondary:active {
+            transform: scale(0.94);
+        }
+
+        .levels-grid {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: stretch;
+            gap: 16px;
+            width: 100%;
+            max-width: 1120px;
+            padding: 10px;
+            overflow-x: auto;
+            box-sizing: border-box;
+        }
+
+        .level-card {
+            flex: 1 1 180px;
+            min-width: 160px;
+            max-width: 210px;
+            background: rgba(18, 24, 43, 0.94);
+            border: 2px solid rgba(56, 239, 125, 0.25);
+            border-radius: 16px;
+            padding: 18px 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            position: relative;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .level-card.unlocked:hover {
+            transform: translateY(-6px);
+            border-color: #38ef7d;
+            box-shadow: 0 10px 30px rgba(56, 239, 125, 0.35);
+        }
+
+        .level-card.unlocked:active {
+            transform: scale(0.96);
+        }
+
+        .level-card.locked {
+            opacity: 0.42;
+            cursor: not-allowed;
+            border-color: rgba(255, 255, 255, 0.1);
+            background: rgba(12, 16, 28, 0.7);
+        }
+
+        .level-badge {
+            background: rgba(56, 239, 125, 0.15);
+            color: #38ef7d;
+            border: 1px solid rgba(56, 239, 125, 0.4);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+
+        .level-card.locked .level-badge {
+            background: rgba(255, 255, 255, 0.08);
+            color: #94a3b8;
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .level-num-display {
+            font-size: 34px;
+            font-weight: 900;
+            color: #ffffff;
+            margin: 6px 0;
+        }
+
+        .level-card-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #cbd5e1;
+            margin-bottom: 12px;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stars-row {
+            display: flex;
+            gap: 4px;
+            font-size: 20px;
+            margin-top: auto;
+        }
+
+        .star-item {
+            color: #2b3648;
+            transition: color 0.2s ease;
+        }
+
+        .star-item.earned {
+            color: #facc15;
+            text-shadow: 0 0 10px rgba(250, 204, 21, 0.85);
+        }
+
+        .lock-icon-wrap {
+            font-size: 32px;
+            margin: 10px 0;
+            color: #64748b;
+        }
+
+        /* ---------------- PART 2: LEVEL COMPLETE MODAL ---------------- */
+        .overlay-modal {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+
+        .modal-card {
+            width: 100%;
+            max-width: 480px;
+            background: rgba(19, 24, 43, 0.96);
+            border: 2.5px solid #38ef7d;
+            border-radius: 24px;
+            padding: 28px 24px;
+            text-align: center;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.8), 0 0 35px rgba(56, 239, 125, 0.3);
+            animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-title {
+            font-size: clamp(22px, 4vw, 28px);
+            font-weight: 900;
+            color: #38ef7d;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+        }
+
+        .modal-level-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 16px;
+        }
+
+        .modal-stars-row {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            font-size: 42px;
+            margin-bottom: 20px;
+        }
+
+        .modal-stats-box {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            background: rgba(10, 14, 28, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px 18px;
+            margin-bottom: 24px;
+        }
+
+        .stat-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .stat-icon {
+            font-size: 18px;
+        }
+
+        .modal-actions-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .modal-btn {
+            flex: 1 1 120px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border: none;
+            outline: none;
+            transition: all 0.15s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-primary {
+            background: #16a34a;
+            color: #ffffff;
+            box-shadow: 0 4px 15px rgba(22, 163, 74, 0.4);
+        }
+
+        .btn-primary:hover {
+            background: #22c55e;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.94);
+        }
+
+        /* Portrait Warning for Mobile Screens */
+        #orientation-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0d1a;
+            color: #38ef7d;
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 24px;
+        }
+
+        #orientation-warning .rotate-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            animation: rotatePrompt 2s ease-in-out infinite alternate;
+        }
+
+        #orientation-warning h2 {
+            font-size: 24px;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        #orientation-warning p {
+            font-size: 15px;
+            color: #a0aec0;
+            max-width: 300px;
+        }
+
+        @keyframes rotatePrompt {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(90deg); }
+        }
+
+        @media screen and (orientation: portrait) and (max-width: 768px) {
+            #orientation-warning {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+
+    <!-- DOM UI OVERLAY: START SCREEN, LEVEL SELECT & LEVEL COMPLETE MODAL -->
+    <div id="ui-overlay">
+        <!-- PART 1: START SCREEN -->
+        <div id="screen-start" class="overlay-panel">
+            <div class="logo-wrap">
+                <img src="assets/icon.png" alt="Slime Flip" class="game-logo" onerror="this.style.display='none'">
+            </div>
+            <h1 class="game-title">SLIME FLIP</h1>
+            <p class="game-subtitle">GRAVITY PLATFORMER</p>
+
+            <button id="btn-play" class="btn-play-round" aria-label="Play Game">
+                <span class="play-icon">▶</span>
+                <span class="play-label">PLAY</span>
+            </button>
+
+            <p class="game-hints">Controls: Arrow Keys / A-D + SPACE / W | Touch Controls</p>
+        </div>
+
+        <!-- PART 2: LEVEL SELECT SCREEN -->
+        <div id="screen-level-select" class="overlay-panel" style="display: none;">
+            <div class="level-select-header">
+                <button id="btn-back-to-start" class="btn-secondary">‹ BACK</button>
+                <h2 class="level-select-title">SELECT LEVEL</h2>
+                <div style="width: 70px;"></div> <!-- visual spacer -->
+            </div>
+
+            <div id="levels-grid" class="levels-grid">
+                <!-- Dynamically rendered level cards (Levels 1 to 5) -->
+            </div>
+        </div>
+
+        <!-- PART 2: LEVEL COMPLETE MODAL -->
+        <div id="screen-level-complete" class="overlay-modal" style="display: none;">
+            <div class="modal-card">
+                <h2 class="modal-title">⭐ LEVEL COMPLETE! ⭐</h2>
+                <h3 id="complete-level-name" class="modal-level-name">Level 1: Crystal Cavern</h3>
+
+                <div id="complete-stars" class="modal-stars-row">
+                    <span class="star-item">★</span>
+                    <span class="star-item">★</span>
+                    <span class="star-item">★</span>
+                </div>
+
+                <div class="modal-stats-box">
+                    <div class="stat-pill"><span class="stat-icon">⏱</span> <span id="complete-time">00:00</span></div>
+                    <div class="stat-pill"><span class="stat-icon">💀</span> <span id="complete-deaths">0 DEATHS</span></div>
+                </div>
+
+                <div class="modal-actions-row">
+                    <button id="btn-replay" class="modal-btn btn-secondary">↺ REPLAY</button>
+                    <button id="btn-next-level" class="modal-btn btn-primary">▶ NEXT LEVEL</button>
+                    <button id="btn-menu" class="modal-btn btn-secondary">☰ MENU</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orientation guide for phones held vertically -->
+    <div id="orientation-warning">
+        <div class="rotate-icon">📱 ↷</div>
+        <h2>Rotate Your Phone</h2>
+        <p>This game is designed for Landscape orientation. Please turn your device sideways to play!</p>
+    </div>
+
+    <!-- Game scripts loaded locally (Works completely offline inside Capacitor Android) -->
+    <script src="phaser.min.js"></script>
+    <script src="levels.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
