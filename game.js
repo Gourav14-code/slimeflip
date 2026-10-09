@@ -42,7 +42,8 @@ var PLAYER = {
 window.PLAYER = PLAYER;
 
 // Debug setting: Set to true to see hitboxes, jump arc visualizer, and on-screen debug HUD
-const DEBUG = true;
+const DEBUG = false;
+const ZONE_GLOW = false;
 
 // ============================================================================
 // STEP 4: LEVEL VALIDATOR
@@ -282,6 +283,14 @@ class SoundController {
         });
     }
 
+    playStarPop(index = 1) {
+        if (this.muted) return;
+        this.init();
+        const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5
+        const f = freqs[Math.min(index - 1, freqs.length - 1)] || 783.99;
+        this.playTone(f, f * 1.15, 0.22, 'sine', 0.25);
+    }
+
         playBounce() {
         if (this.muted) return;
         this.init();
@@ -453,6 +462,7 @@ const UIManager = {
     },
 
     hideOverlay() {
+        this.stopConfetti();
         if (!this.overlay) this.overlay = document.getElementById('ui-overlay');
         if (this.overlay) this.overlay.style.display = 'none';
         try {
@@ -467,6 +477,7 @@ const UIManager = {
     },
 
     openStartScreen() {
+        this.stopConfetti();
         this.showScreen('start');
         try {
             if (this.scene && this.scene.scene && typeof this.scene.scene.isPaused === 'function') {
@@ -480,6 +491,7 @@ const UIManager = {
     },
 
     openLevelSelect() {
+        this.stopConfetti();
         this.renderLevelsGrid();
         this.showScreen('select');
         try {
@@ -541,8 +553,99 @@ const UIManager = {
         });
     },
 
+    launchConfetti() {
+        const canvas = document.getElementById('confetti-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const colors = ['#38ef7d', '#00f2fe', '#facc15', '#ff477e', '#a855f7', '#ffffff'];
+        const particles = [];
+        const count = 75;
+
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI / 180) * (Phaser.Math.Between(50, 130));
+            const speed = Phaser.Math.Between(10, 22);
+            const dir = (Math.random() > 0.5 ? 1 : -1);
+            particles.push({
+                x: canvas.width / 2 + (Math.random() - 0.5) * 120,
+                y: canvas.height / 2 + 40,
+                vx: Math.cos(angle) * dir * speed * (0.7 + Math.random() * 0.6),
+                vy: -Math.sin(angle) * speed,
+                size: Phaser.Math.Between(7, 13),
+                color: colors[Math.floor(Math.random() * colors.length)],
+                rotation: Math.random() * 360,
+                rotSpeed: (Math.random() - 0.5) * 12,
+                gravity: 0.42,
+                drag: 0.985,
+                alpha: 1
+            });
+        }
+
+        const startTime = Date.now();
+        if (window._confettiAnimId) cancelAnimationFrame(window._confettiAnimId);
+
+        function renderConfetti() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let alive = false;
+            const elapsed = (Date.now() - startTime) / 1000;
+
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.vx *= p.drag;
+                p.rotation += p.rotSpeed;
+                if (elapsed > 1.3) {
+                    p.alpha = Math.max(0, p.alpha - 0.025);
+                }
+
+                if (p.alpha > 0 && p.y < canvas.height + 40) {
+                    alive = true;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rotation * Math.PI) / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+                    ctx.restore();
+                }
+            });
+
+            if (alive && elapsed < 3.5) {
+                window._confettiAnimId = requestAnimationFrame(renderConfetti);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        window._confettiAnimId = requestAnimationFrame(renderConfetti);
+    },
+
+    stopConfetti() {
+        if (window._confettiAnimId) {
+            cancelAnimationFrame(window._confettiAnimId);
+            window._confettiAnimId = null;
+        }
+        const canvas = document.getElementById('confetti-canvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    },
+
     showLevelComplete(levelId, levelName, deaths, timeSec) {
         const { starsEarned } = GameStorage.recordClear(levelId, deaths);
+
+        const congratsEl = document.getElementById('complete-congrats');
+        if (congratsEl) {
+            if (levelId === 5) {
+                congratsEl.textContent = "You finished all levels! You are a Slime Master!";
+            } else {
+                congratsEl.textContent = "Great job, you made it!";
+            }
+        }
 
         const nameEl = document.getElementById('complete-level-name');
         if (nameEl) nameEl.textContent = levelName;
@@ -552,9 +655,18 @@ const UIManager = {
             starsEl.innerHTML = '';
             for (let s = 1; s <= 3; s++) {
                 const span = document.createElement('span');
-                span.className = `star-item ${s <= starsEarned ? 'earned' : ''}`;
+                span.className = 'star-item';
                 span.textContent = '★';
                 starsEl.appendChild(span);
+
+                if (s <= starsEarned) {
+                    setTimeout(() => {
+                        span.classList.add('earned', 'pop-anim');
+                        if (window.soundManager && typeof window.soundManager.playStarPop === 'function') {
+                            window.soundManager.playStarPop(s);
+                        }
+                    }, s * 230);
+                }
             }
         }
 
@@ -568,12 +680,33 @@ const UIManager = {
         const deathsEl = document.getElementById('complete-deaths');
         if (deathsEl) deathsEl.textContent = `${deaths} DEATH${deaths === 1 ? '' : 'S'}`;
 
-        const hasNext = (this.scene.currentLevelIndex + 1 < GAME_LEVELS.length);
+        const hasNext = (this.scene && this.scene.currentLevelIndex + 1 < GAME_LEVELS.length);
         const btnNext = document.getElementById('btn-next-level');
         if (btnNext) {
-            btnNext.textContent = hasNext ? '▶ NEXT LEVEL' : '★ ALL CLEARED!';
+            if (levelId === 5 || !hasNext) {
+                btnNext.textContent = '☰ MENU';
+                btnNext.onclick = () => {
+                    soundManager.playClick();
+                    this.stopConfetti();
+                    this.openLevelSelect();
+                };
+            } else {
+                btnNext.textContent = '▶ NEXT LEVEL';
+                btnNext.onclick = () => {
+                    soundManager.playClick();
+                    this.stopConfetti();
+                    this.hideOverlay();
+                    const nextIndex = (this.scene ? this.scene.currentLevelIndex : 0) + 1;
+                    if (nextIndex < GAME_LEVELS.length) {
+                        if (this.scene) this.scene.startLevelFromMenu(nextIndex);
+                    } else {
+                        this.openLevelSelect();
+                    }
+                };
+            }
         }
 
+        this.launchConfetti();
         this.showScreen('complete');
     }
 };
@@ -756,6 +889,17 @@ class GameScene extends Phaser.Scene {
     loadLevel(levelIndex) {
         this.clearActiveHazards();
 
+        if (this.hazardDecorGfx) { this.hazardDecorGfx.clear(); }
+        if (this.hazardWarnGfx) { this.hazardWarnGfx.clear(); }
+        if (this.arcGfx) { this.arcGfx.clear(); }
+
+        if (!this.hazardDecorGfx) {
+            this.hazardDecorGfx = this.add.graphics().setDepth(2);
+        }
+        if (!this.hazardWarnGfx) {
+            this.hazardWarnGfx = this.add.graphics().setDepth(4);
+        }
+
         if (this.platforms) this.platforms.clear(true, true);
         if (this.fallingPlatformsGroup) this.fallingPlatformsGroup.clear(true, true);
         if (this.telegraphedHazardsGroup) this.telegraphedHazardsGroup.clear(true, true);
@@ -776,6 +920,8 @@ class GameScene extends Phaser.Scene {
         this.isFlipped = false;
         this.isDead = false;
         this.hasWon = false;
+        this.levelCompleted = false;
+        this.inputLocked = false;
         this.physics.world.gravity.y = PLAYER.GRAVITY;
         this.respawnGraceTimer = this.time.now + 1000;
 
@@ -837,20 +983,28 @@ class GameScene extends Phaser.Scene {
         this.bouncePadsGroup = this.physics.add.staticGroup();
         this.initTelegraphedHazards(levelData.telegraphedHazards || []);
 
-        // 5. Static Spikes Group (Hitbox sized to 85% of image, centered)
+        // 5. Static Spikes Group (Hitbox sized to 85% of image, centered, sitting flush on ground/ceiling)
         this.spikes = this.physics.add.staticGroup();
         if (levelData.spikes) {
             levelData.spikes.forEach(s => {
-                const spike = this.spikes.create(s.x, s.y, 'spikes');
+                let sy = s.y;
+                if (s.side === 'ceiling' || sy < 300) {
+                    sy = 145 + s.height / 2;
+                } else if (sy < 640) {
+                    sy = 620 - s.height / 2;
+                }
+                const spike = this.spikes.create(s.x, sy, 'spikes');
                 spike.setDisplaySize(s.width, s.height);
 
-                if (s.side === 'ceiling') {
+                if (s.side === 'ceiling' || s.y < 300) {
                     spike.setFlipY(true);
                 }
 
                 // Precision 85% hitbox centered on visual image
-                spike.body.setSize(spike.width * 0.85, spike.height * 0.80, true);
+                spike.body.setSize(spike.width * 0.85, spike.height * 0.85, true);
                 spike.refreshBody();
+
+                this.addHazardWarning(s.x - s.width / 2);
             });
         }
 
@@ -878,6 +1032,9 @@ class GameScene extends Phaser.Scene {
         this.goal.setDisplaySize(60, 95);
         this.goal.body.setAllowGravity(false);
         this.goal.body.setImmovable(true);
+        // Tight physical hitbox at pole and cloth (24x60 px)
+        this.goal.body.setSize(this.goal.width * (24 / 60), this.goal.height * (60 / 95), true);
+        this.goal.refreshBody();
 
         this.tweens.add({
             targets: this.goal,
@@ -916,7 +1073,12 @@ class GameScene extends Phaser.Scene {
         }, null, this);
 
         this.physics.add.overlap(this.player, this.checkpointsGroup, (player, flag) => this.handleReachCheckpoint(flag), null, this);
-        this.physics.add.overlap(this.player, this.goal, () => this.handleLevelComplete(), null, this);
+        this.physics.add.overlap(this.player, this.goal, () => {
+            if (this.levelCompleted || this.hasWon || this.isDead) return;
+            if (Math.abs(this.player.y - this.goal.y) < 65) {
+                this.handleLevelComplete();
+            }
+        }, null, this);
 
         this.physics.add.overlap(this.player, this.bouncePadsGroup, (player, pad) => {
             if (this.time.now < pad.lastBounceTime) return;
@@ -969,7 +1131,46 @@ class GameScene extends Phaser.Scene {
     // Flip Zones & Lock Zones (Clean background gameplay - no visual clutter)
     // ------------------------------------------------------------------------
     createZoneOverlays(zones) {
-        // Kept 100% clean and natural without colored screen tints or floating labels
+        if (!ZONE_GLOW) return;
+        if (!this.zoneGraphics) {
+            this.zoneGraphics = this.add.graphics().setDepth(1);
+        }
+        this.zoneGraphics.clear();
+        zones.forEach(z => {
+            if (z.type === 'flipZone') {
+                this.zoneGraphics.fillStyle(0x00f2fe, 0.05); // soft glow, no border
+                this.zoneGraphics.fillRect(z.x, 0, z.width, 720);
+            } else if (z.type === 'lockZone') {
+                this.zoneGraphics.fillStyle(0xff0055, 0.05); // soft glow, no border
+                this.zoneGraphics.fillRect(z.x, 0, z.width, 720);
+            }
+        });
+    }
+
+    addHazardWarning(hazardStartX) {
+        if (!this.hazardWarnGfx) {
+            this.hazardWarnGfx = this.add.graphics().setDepth(4);
+        }
+        const warnX = Math.round(hazardStartX - 60);
+        if (warnX < 260) return; // Don't place too close to spawn point
+
+        // Subtle red ground glow
+        this.hazardWarnGfx.fillStyle(0xef4444, 0.16);
+        this.hazardWarnGfx.fillEllipse(warnX, 619, 18, 5);
+
+        // Small clean 13px warning triangle
+        this.hazardWarnGfx.fillStyle(0xd97706, 0.9);
+        this.hazardWarnGfx.beginPath();
+        this.hazardWarnGfx.moveTo(warnX, 606);
+        this.hazardWarnGfx.lineTo(warnX - 7, 618);
+        this.hazardWarnGfx.lineTo(warnX + 7, 618);
+        this.hazardWarnGfx.closePath();
+        this.hazardWarnGfx.fillPath();
+
+        // Small exclamation point
+        this.hazardWarnGfx.fillStyle(0xffffff, 1);
+        this.hazardWarnGfx.fillRect(warnX - 1, 609, 2, 4);
+        this.hazardWarnGfx.fillCircle(warnX, 615.5, 1);
     }
 
     // ------------------------------------------------------------------------
@@ -1016,13 +1217,21 @@ class GameScene extends Phaser.Scene {
     // 1. Moving Hazard (Ping-pong Saws or Spikes)
     createMovingHazard(data) {
         const texKey = data.hazardType === 'spikes' ? 'spikes' : 'saw';
-        const hazard = this.telegraphedHazardsGroup.create(data.x, data.y, texKey);
+        let posY = data.y;
+
+        // For ground patrol saw: position saw so blade rolls flush on ground track (y = 620)
+        const radius = data.radius || (data.height ? data.height / 2 : 36);
+        if ((data.type === 'patrolSaw' || texKey === 'saw') && data.axis === 'horizontal' && posY > 400) {
+            posY = 620 - radius;
+        }
+
+        const hazard = this.telegraphedHazardsGroup.create(data.x, posY, texKey);
         hazard.setDisplaySize(data.radius ? data.radius * 2 : data.width, data.radius ? data.radius * 2 : data.height);
         hazard.body.setAllowGravity(false);
         hazard.body.setImmovable(true);
 
-        // BUG 1 FIX: Accurate 85% centered hitbox in unscaled texture space!
-        if (data.hazardType === 'saw' || data.radius) {
+        // Accurate 85% centered hitbox in unscaled texture space
+        if (data.hazardType === 'saw' || data.radius || texKey === 'saw') {
             const unscaledRadius = (hazard.width * 0.5) * 0.85;
             const unscaledOffsetX = (hazard.width - unscaledRadius * 2) / 2;
             const unscaledOffsetY = (hazard.height - unscaledRadius * 2) / 2;
@@ -1033,7 +1242,33 @@ class GameScene extends Phaser.Scene {
         hazard.body.enable = true;
 
         const targetX = data.axis === 'horizontal' ? data.x + data.distance : data.x;
-        const targetY = data.axis === 'vertical' ? data.y + data.distance : data.y;
+        const targetY = data.axis === 'vertical' ? posY + data.distance : posY;
+
+        // Draw visible ground track/groove for patrolSaw
+        if ((data.type === 'patrolSaw' || texKey === 'saw') && data.axis === 'horizontal' && posY > 400) {
+            const minX = Math.min(data.x, targetX);
+            const maxX = Math.max(data.x, targetX);
+            const trackY = 620;
+
+            if (this.hazardDecorGfx) {
+                // Dark recessed groove slot
+                this.hazardDecorGfx.fillStyle(0x0a0f1d, 0.95);
+                this.hazardDecorGfx.fillRect(minX - 6, trackY - 3, (maxX - minX) + 12, 6);
+                // Metallic guide rails
+                this.hazardDecorGfx.lineStyle(1.5, 0x334155, 0.85);
+                this.hazardDecorGfx.strokeRect(minX - 6, trackY - 3, (maxX - minX) + 12, 6);
+                // Metallic bumper stops at endpoints
+                this.hazardDecorGfx.fillStyle(0x64748b, 1);
+                this.hazardDecorGfx.fillCircle(minX - 6, trackY, 5);
+                this.hazardDecorGfx.fillCircle(maxX + 6, trackY, 5);
+                this.hazardDecorGfx.fillStyle(0x94a3b8, 1);
+                this.hazardDecorGfx.fillCircle(minX - 6, trackY, 2.5);
+                this.hazardDecorGfx.fillCircle(maxX + 6, trackY, 2.5);
+            }
+            this.addHazardWarning(minX);
+        } else {
+            this.addHazardWarning(Math.min(data.x, targetX));
+        }
 
         const tween = this.tweens.add({
             targets: hazard,
@@ -1049,7 +1284,7 @@ class GameScene extends Phaser.Scene {
             hazard,
             reset: () => {
                 tween.restart();
-                hazard.setPosition(data.x, data.y);
+                hazard.setPosition(data.x, posY);
                 hazard.body.enable = true;
                 hazard.setAlpha(1.0);
             }
@@ -1059,15 +1294,22 @@ class GameScene extends Phaser.Scene {
     // 2. Blink Hazard (Blinks 3 times, disappears for 1.5s, then returns)
     createBlinkHazard(data) {
         const texKey = data.hazardType === 'platform' ? 'platform_stone' : 'spikes';
-        const hazard = this.telegraphedHazardsGroup.create(data.x, data.y, texKey);
+        let posY = data.y;
+        if (data.hazardType === 'spikes' && posY > 450 && posY < 640) {
+            posY = 620 - (data.height || 45) / 2;
+        }
+
+        const hazard = this.telegraphedHazardsGroup.create(data.x, posY, texKey);
         hazard.setDisplaySize(data.width, data.height);
         hazard.body.setAllowGravity(false);
         hazard.body.setImmovable(true);
 
         if (data.side === 'ceiling') hazard.setFlipY(true);
-        // BUG 1 FIX: 85% centered body
+        // Centered 85% body
         hazard.body.setSize(hazard.width * 0.85, hazard.height * 0.80, true);
         hazard.body.enable = true;
+
+        this.addHazardWarning(data.x - data.width / 2);
 
         const blinkCount = data.blinkCount || 3;
         const disappearDuration = data.disappearDuration || 1500;
@@ -1080,7 +1322,7 @@ class GameScene extends Phaser.Scene {
             if (!isRunning || !hazard.active) return;
 
             // Phase 1: Solid & Deadly
-            hazard.enableBody(true, data.x, data.y, true, true);
+            hazard.enableBody(true, data.x, posY, true, true);
             hazard.setAlpha(1.0);
             hazard.clearTint();
 
@@ -1134,6 +1376,7 @@ class GameScene extends Phaser.Scene {
         hazard.body.setAllowGravity(false);
         hazard.body.setImmovable(true);
         hazard.body.setSize(hazard.width * 0.85, hazard.height * 0.80, true);
+        this.addHazardWarning(data.x - data.width / 2);
 
         const slideDistance = data.slideDistance || 45;
         const retractedY = (data.direction === 'down') ? data.y - slideDistance : data.y + slideDistance;
@@ -1656,20 +1899,32 @@ class GameScene extends Phaser.Scene {
 
     // 9. Rising Spikes (Rest -> warning shake -> rise lethal -> retract)
     createRisingSpikes(data) {
-        const hazard = this.telegraphedHazardsGroup.create(data.x, data.y, 'spikes');
-        hazard.setDisplaySize(data.width || 120, data.height || 45);
+        const hHeight = data.height || 45;
+        const hWidth = data.width || 120;
+        let extendedY = data.y;
+
+        // Position flush with floor surface (y = 620) or ceiling surface (y = 145)
+        if (data.side === 'ceiling' || data.y < 300) {
+            extendedY = 145 + hHeight / 2;
+        } else if (data.y < 640) {
+            extendedY = 620 - hHeight / 2;
+        }
+
+        const hazard = this.telegraphedHazardsGroup.create(data.x, extendedY, 'spikes');
+        hazard.setDisplaySize(hWidth, hHeight);
         hazard.body.setAllowGravity(false);
         hazard.body.setImmovable(true);
-        hazard.body.setSize(hazard.width * 0.85, hazard.height * 0.80, true);
+        hazard.body.setSize(hazard.width * 0.85, hazard.height * 0.85, true);
 
-        if (data.side === 'ceiling') hazard.setFlipY(true);
+        if (data.side === 'ceiling' || data.y < 300) hazard.setFlipY(true);
 
-        const retractedY = (data.side === 'ceiling') ? data.y - 45 : data.y + 45;
-        const extendedY = data.y;
+        const retractedY = (data.side === 'ceiling' || data.y < 300) ? extendedY - hHeight - 5 : extendedY + hHeight + 5;
 
         hazard.setPosition(data.x, retractedY);
         hazard.disableBody(true, false);
         hazard.setAlpha(0.2);
+
+        this.addHazardWarning(data.x - hWidth / 2);
 
         let isRunning = true;
         let activeTimer = null;
@@ -1757,6 +2012,24 @@ class GameScene extends Phaser.Scene {
         const anchor = this.add.circle(pivotX, pivotY, 8, 0x475569).setDepth(6);
         const chainGfx = this.add.graphics().setDepth(5);
 
+        // Faint trajectory arc showing saw path
+        const arcGfx = this.add.graphics().setDepth(3);
+        arcGfx.lineStyle(2, 0xef4444, 0.22);
+        arcGfx.beginPath();
+        arcGfx.arc(pivotX, pivotY, ropeLength, Math.PI / 2 - maxAngleRad, Math.PI / 2 + maxAngleRad);
+        arcGfx.strokePath();
+
+        // Faint shadow / danger strip on ground surface where saw passes
+        const minSwingX = pivotX - Math.sin(maxAngleRad) * ropeLength;
+        const maxSwingX = pivotX + Math.sin(maxAngleRad) * ropeLength;
+        const shadowGfx = this.add.graphics().setDepth(3);
+        shadowGfx.fillStyle(0x000000, 0.32);
+        shadowGfx.fillRoundedRect(minSwingX - 16, 616, (maxSwingX - minSwingX) + 32, 7, 3);
+        shadowGfx.lineStyle(1, 0xf59e0b, 0.3);
+        shadowGfx.strokeRoundedRect(minSwingX - 16, 616, (maxSwingX - minSwingX) + 32, 7, 3);
+
+        this.addHazardWarning(minSwingX);
+
         const saw = this.telegraphedHazardsGroup.create(pivotX, pivotY + ropeLength, 'saw');
         saw.setDisplaySize(80, 80);
         saw.body.setAllowGravity(false);
@@ -1781,7 +2054,7 @@ class GameScene extends Phaser.Scene {
             saw.angle += 3.5;
 
             chainGfx.clear();
-            chainGfx.lineStyle(2.5, 0x94a3b8, 0.8);
+            chainGfx.lineStyle(2.5, 0x94a3b8, 0.85);
             chainGfx.lineBetween(pivotX, pivotY, sawX, sawY);
         };
 
@@ -1789,9 +2062,13 @@ class GameScene extends Phaser.Scene {
             saw,
             anchor,
             chainGfx,
+            arcGfx,
+            shadowGfx,
             update: updateSwinging,
             cleanup: () => {
                 if (chainGfx) chainGfx.destroy();
+                if (arcGfx) arcGfx.destroy();
+                if (shadowGfx) shadowGfx.destroy();
                 if (anchor) anchor.destroy();
             },
             reset: () => {}
@@ -2480,12 +2757,6 @@ class GameScene extends Phaser.Scene {
             });
         }
 
-        if (this.goal && this.player && !this.hasWon && !this.isDead) {
-            if (Math.abs(this.player.x - this.goal.x) < 55) {
-                this.handleLevelComplete();
-            }
-        }
-
         // 9. Dynamic Hints
         this.checkHintsAtPosition(this.player.x);
 
@@ -2654,14 +2925,31 @@ class GameScene extends Phaser.Scene {
     // Victory & Level Complete Modal
     // ------------------------------------------------------------------------
     handleLevelComplete() {
-        if (this.hasWon || this.isDead) return;
+        if (this.levelCompleted || this.hasWon || this.isDead) return;
+        this.levelCompleted = true;
         this.hasWon = true;
+        this.inputLocked = true;
+        this.touchLeft = false;
+        this.touchRight = false;
+        this.touchJumpDown = false;
 
         soundManager.playWin();
 
         if (this.player && this.player.body) {
             this.player.body.enable = false;
             this.player.setVelocity(0, 0);
+        }
+
+        // Disable all hazard physics bodies so no hazard can hurt the player
+        if (this.telegraphedHazardsGroup) {
+            this.telegraphedHazardsGroup.getChildren().forEach(h => {
+                if (h.body) h.body.enable = false;
+            });
+        }
+        if (this.spikes) {
+            this.spikes.getChildren().forEach(s => {
+                if (s.body) s.body.enable = false;
+            });
         }
 
         // Stop all player tweens to prevent bubbling/repeated shaking
