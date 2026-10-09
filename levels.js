@@ -335,12 +335,12 @@ const GAME_LEVELS = [
                 width: 700,
                 height: 720
             },
-            // Flip Zone 2: x: 4000 to 4650
+            // Flip Zone 2: x: 4000 to 4720
             {
                 type: "flipZone",
                 x: 4000,
                 y: 0,
-                width: 650,
+                width: 720,
                 height: 720
             }
         ],
@@ -365,10 +365,10 @@ const GAME_LEVELS = [
             // [Gap 5: 3700 to 3800 = 100 px gap <= 120 px]
             // 8. Pre-Flip 2 Island with Bounce Pad (x: 3800 to 4080)
             { x: 3940, y: 650, width: 280, height: 60, type: "stone" },
-            // 9. Flip Zone 2 Metal Ceiling (x: 4000 to 4650, y: 115)
-            { x: 4325, y: 115, width: 650, height: 60, type: "metal" },
-            // 10. Post Flip 2 Landing Floor (x: 4600 to 4750)
-            { x: 4675, y: 650, width: 150, height: 60, type: "stone" },
+            // 9. Flip Zone 2 Metal Ceiling (x: 4000 to 4680, y: 115)
+            { x: 4340, y: 115, width: 680, height: 60, type: "metal" },
+            // 10. Post Flip 2 Landing Floor (x: 4580 to 4750)
+            { x: 4665, y: 650, width: 170, height: 60, type: "stone" },
             // [Gap 6: 4750 to 4850 = 100 px gap <= 120 px]
             // 11. Final Goal Platform (x: 4850 to 5000)
             { x: 4925, y: 650, width: 150, height: 60, type: "stone" }
@@ -455,17 +455,18 @@ const GAME_LEVELS = [
                 height: 36,
                 strength: -680
             },
-            // Hazard 8: Ceiling Moving Saw in Flip Zone 2
+            // Hazard 8: Ceiling Moving Saw in Flip Zone 2 (shifted right for accurate flip spacing and landing)
             {
                 id: "moving_saw_3_ceiling",
                 type: "movingHazard",
                 hazardType: "saw",
-                x: 4300,
-                y: 185,
+                x: 4440,
+                y: 181,
                 radius: 36,
+                side: "ceiling",
                 axis: "horizontal",
-                distance: 120,
-                duration: 2000
+                distance: 100,
+                duration: 2200
             },
             // Hazard 9: Falling Platform 3 before goal
             {
