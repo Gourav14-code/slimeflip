@@ -18,7 +18,7 @@
 // ============================================================================
 // PLAYER MOVEMENT & CALIBRATION CONSTANTS (Tuning Parameters)
 // ============================================================================
-const PLAYER = {
+var PLAYER = {
     WIDTH: 64,
     HEIGHT: 64,
     HITBOX_WIDTH: 51,

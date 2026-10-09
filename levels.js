@@ -9,7 +9,7 @@
 // - CLEARANCE_HEIGHT: 105 px (player height x 1.6)
 // ============================================================================
 
-const PLAYER = {
+var PLAYER = (typeof window !== 'undefined' && window.PLAYER) ? window.PLAYER : {
     WIDTH: 64,
     HEIGHT: 64,
     HITBOX_WIDTH: 51,
