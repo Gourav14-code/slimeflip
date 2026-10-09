@@ -1093,11 +1093,6 @@ class GameScene extends Phaser.Scene {
 
         this.player.body.setSize(PLAYER.HITBOX_WIDTH, PLAYER.HITBOX_HEIGHT, true);
         this.player.body.setMaxVelocity(PLAYER.RUN_SPEED, PLAYER.MAX_FALL_SPEED);
-        // Lock physics hitbox to constant rigid dimensions so juicy squash/stretch animations never disturb platform physics
-        this.player.body.updateBounds = function() {
-            this.width = this.sourceWidth;
-            this.height = this.sourceHeight;
-        };
 
         // 9. Colliders & Overlaps (BUG 1 FIX: Kills instantly when hazard is visible!)
         this.physics.add.collider(this.player, this.platforms);
