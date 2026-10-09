@@ -83,12 +83,12 @@ const GAME_LEVELS = [
                 id: "patrol_saw_1_1",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 950,
-                y: 595,
+                x: 900,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 120,
-                duration: 2000
+                distance: 260,
+                duration: 2400
             },
             // 2. blinkHazard Tutorial (Taught alone, warning 3 blinks, safe crossing window)
             {
@@ -111,12 +111,12 @@ const GAME_LEVELS = [
                 id: "patrol_saw_1_2",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 3050,
-                y: 595,
+                x: 2850,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 120,
-                duration: 2000
+                distance: 260,
+                duration: 2400
             },
             // 4. blinkHazard #2 (Final challenge before goal flag)
             {
@@ -213,17 +213,17 @@ const GAME_LEVELS = [
                 height: 36,
                 strength: -680
             },
-            // Hazard 2: patrolSaw on elevated platform
+            // Hazard 2: patrolSaw on elevated platform - covers the platform surface across the walk area!
             {
                 id: "patrol_saw_2_1",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 1750,
-                y: 515,
+                x: 1620,
+                y: 504,
                 radius: 36,
                 axis: "horizontal",
-                distance: 120,
-                duration: 2000
+                distance: 340,
+                duration: 2600
             },
             // Hazard 3: blinkHazard on floor of checkpoint platform
             {
@@ -268,12 +268,12 @@ const GAME_LEVELS = [
                 id: "patrol_saw_2_2",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 3750,
-                y: 595,
+                x: 3600,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 110,
-                duration: 2000
+                distance: 220,
+                duration: 2200
             },
             // Hazard 7: blinkHazard before goal flag
             {
@@ -402,12 +402,12 @@ const GAME_LEVELS = [
                 id: "patrol_saw_3_1",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 1650,
-                y: 595,
+                x: 1550,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 130,
-                duration: 2000
+                distance: 280,
+                duration: 2500
             },
             // Hazard 4: Falling Platform 2 (bridges middle island to checkpoint)
             {
@@ -592,12 +592,12 @@ const GAME_LEVELS = [
                 id: "patrol_saw_4_1",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 1250,
-                y: 595,
+                x: 1180,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 120,
-                duration: 2000
+                distance: 220,
+                duration: 2200
             },
             // Hazard 3: Falling platform before Flip 1
             {
@@ -640,12 +640,12 @@ const GAME_LEVELS = [
                 id: "patrol_saw_4_lock",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 3150,
-                y: 595,
+                x: 3100,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 130,
-                duration: 2000
+                distance: 300,
+                duration: 2500
             },
             // Hazard 7: Lock Zone Hazard 2 - vertical Laser Gate
             {
@@ -689,11 +689,11 @@ const GAME_LEVELS = [
                 id: "patrol_saw_4_post",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 4850,
-                y: 595,
+                x: 4820,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 110,
+                distance: 180,
                 duration: 2000
             },
             // Hazard 11: risingSpikes in final stretch
@@ -828,12 +828,12 @@ const GAME_LEVELS = [
                 id: "patrol_saw_5_1",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 1250,
-                y: 595,
+                x: 1060,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 130,
-                duration: 2000
+                distance: 260,
+                duration: 2400
             },
             // Hazard 3: risingSpikes before Checkpoint 1
             {
@@ -890,11 +890,11 @@ const GAME_LEVELS = [
                 id: "patrol_saw_5_mid",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 3100,
-                y: 595,
+                x: 3020,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 100,
+                distance: 160,
                 duration: 2000
             },
             // Hazard 8: Double-Flip Ceiling Laser Gate 2
@@ -962,12 +962,12 @@ const GAME_LEVELS = [
                 id: "patrol_saw_5_final",
                 type: "patrolSaw",
                 hazardType: "saw",
-                x: 5450,
-                y: 595,
+                x: 5330,
+                y: 584,
                 radius: 36,
                 axis: "horizontal",
-                distance: 120,
-                duration: 2000
+                distance: 220,
+                duration: 2200
             },
             // Hazard 14: Final challenge: Swinging Saw #3 before goal
             {

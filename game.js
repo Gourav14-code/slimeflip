@@ -41,6 +41,30 @@ var PLAYER = {
 };
 window.PLAYER = PLAYER;
 
+// ==========================================
+// ANIM CONSTANTS (Tune animation timings & strengths here)
+// ==========================================
+const ANIM = {
+    DISPLAY_HEIGHT: 64,
+    BREATHING_DURATION: 1200,      // ms
+    BREATHING_SCALE_Y: 1.04,
+    BLINK_INTERVAL_MIN: 3000,      // ms
+    BLINK_INTERVAL_MAX: 5000,      // ms
+    BLINK_DURATION: 120,           // ms
+    WALK_STEP_DURATION: 120,       // ms
+    JUMP_ANTICIPATION: 60,         // ms
+    JUMP_ANTICIPATION_SCALE_Y: 0.8,
+    JUMP_STRETCH_SCALE_Y: 1.2,
+    JUMP_STRETCH_SCALE_X: 0.85,
+    LAND_SQUASH_DURATION: 100,     // ms
+    DIRECTION_CHANGE_SQUASH: 80,   // ms
+    GRAVITY_FLIP_DURATION: 150,    // ms
+    DEATH_FADE_DURATION: 300,      // ms
+    RESPAWN_DURATION: 200,         // ms
+    GEM_POP_DURATION: 150          // ms
+};
+window.ANIM = ANIM;
+
 // Debug setting: Set to true to see hitboxes, jump arc visualizer, and on-screen debug HUD
 const DEBUG = false;
 const ZONE_GLOW = false;
@@ -665,7 +689,7 @@ const UIManager = {
                         if (window.soundManager && typeof window.soundManager.playStarPop === 'function') {
                             window.soundManager.playStarPop(s);
                         }
-                    }, s * 230);
+                    }, s * ((window.ANIM ? window.ANIM.GEM_POP_DURATION : 150) + 70));
                 }
             }
         }
@@ -751,6 +775,24 @@ class GameScene extends Phaser.Scene {
         this.jumpStartY = 0;
 
         this.activeHazardControllers = [];
+
+        // Animation state variables
+        this.lastMoveDir = 1;
+        this.directionSquashUntil = 0;
+        this.landingSquashUntil = 0;
+        this.nextBlinkTime = 0;
+        this.blinkUntil = 0;
+    }
+
+    setPlayerSpriteTexture(key, flipY = false) {
+        if (!this.player) return;
+        if (this.player.texture.key !== key) {
+            this.player.setTexture(key);
+            this.player.body.setSize(PLAYER.HITBOX_WIDTH, PLAYER.HITBOX_HEIGHT, true);
+        }
+        if (this.player.flipY !== flipY) {
+            this.player.setFlipY(flipY);
+        }
     }
 
     preload() {
@@ -889,13 +931,9 @@ class GameScene extends Phaser.Scene {
     loadLevel(levelIndex) {
         this.clearActiveHazards();
 
-        if (this.hazardDecorGfx) { this.hazardDecorGfx.clear(); }
         if (this.hazardWarnGfx) { this.hazardWarnGfx.clear(); }
         if (this.arcGfx) { this.arcGfx.clear(); }
 
-        if (!this.hazardDecorGfx) {
-            this.hazardDecorGfx = this.add.graphics().setDepth(2);
-        }
         if (!this.hazardWarnGfx) {
             this.hazardWarnGfx = this.add.graphics().setDepth(4);
         }
@@ -1055,6 +1093,11 @@ class GameScene extends Phaser.Scene {
 
         this.player.body.setSize(PLAYER.HITBOX_WIDTH, PLAYER.HITBOX_HEIGHT, true);
         this.player.body.setMaxVelocity(PLAYER.RUN_SPEED, PLAYER.MAX_FALL_SPEED);
+        // Lock physics hitbox to constant rigid dimensions so juicy squash/stretch animations never disturb platform physics
+        this.player.body.updateBounds = function() {
+            this.width = this.sourceWidth;
+            this.height = this.sourceHeight;
+        };
 
         // 9. Colliders & Overlaps (BUG 1 FIX: Kills instantly when hazard is visible!)
         this.physics.add.collider(this.player, this.platforms);
@@ -1218,11 +1261,33 @@ class GameScene extends Phaser.Scene {
     createMovingHazard(data) {
         const texKey = data.hazardType === 'spikes' ? 'spikes' : 'saw';
         let posY = data.y;
-
-        // For ground patrol saw: position saw so blade rolls flush on ground track (y = 620)
         const radius = data.radius || (data.height ? data.height / 2 : 36);
-        if ((data.type === 'patrolSaw' || texKey === 'saw') && data.axis === 'horizontal' && posY > 400) {
-            posY = 620 - radius;
+
+        // Position patrol saw right on top of its platform surface
+        if ((data.type === 'patrolSaw' || texKey === 'saw') && data.axis === 'horizontal') {
+            if (this.levelData && this.levelData.platforms) {
+                const targetX = data.x + data.distance;
+                const midX = (data.x + targetX) / 2;
+                // Find matching floor or ceiling platform
+                const candidatePlats = this.levelData.platforms.filter(p => {
+                    const left = p.x - p.width / 2;
+                    const right = p.x + p.width / 2;
+                    return (midX >= left && midX <= right) || (data.x >= left && data.x <= right);
+                });
+                if (candidatePlats.length > 0) {
+                    if (data.side === 'ceiling' || posY < 300) {
+                        const ceilPlat = candidatePlats.find(p => p.y < 300);
+                        if (ceilPlat) posY = (ceilPlat.y + ceilPlat.height / 2) + radius;
+                    } else {
+                        const floorPlats = candidatePlats.filter(p => p.y >= 300);
+                        if (floorPlats.length > 0) {
+                            floorPlats.sort((a, b) => Math.abs(a.y - (data.y || 600)) - Math.abs(b.y - (data.y || 600)));
+                            const platformTop = floorPlats[0].y - floorPlats[0].height / 2;
+                            posY = platformTop - radius;
+                        }
+                    }
+                }
+            }
         }
 
         const hazard = this.telegraphedHazardsGroup.create(data.x, posY, texKey);
@@ -1244,31 +1309,8 @@ class GameScene extends Phaser.Scene {
         const targetX = data.axis === 'horizontal' ? data.x + data.distance : data.x;
         const targetY = data.axis === 'vertical' ? posY + data.distance : posY;
 
-        // Draw visible ground track/groove for patrolSaw
-        if ((data.type === 'patrolSaw' || texKey === 'saw') && data.axis === 'horizontal' && posY > 400) {
-            const minX = Math.min(data.x, targetX);
-            const maxX = Math.max(data.x, targetX);
-            const trackY = 620;
-
-            if (this.hazardDecorGfx) {
-                // Dark recessed groove slot
-                this.hazardDecorGfx.fillStyle(0x0a0f1d, 0.95);
-                this.hazardDecorGfx.fillRect(minX - 6, trackY - 3, (maxX - minX) + 12, 6);
-                // Metallic guide rails
-                this.hazardDecorGfx.lineStyle(1.5, 0x334155, 0.85);
-                this.hazardDecorGfx.strokeRect(minX - 6, trackY - 3, (maxX - minX) + 12, 6);
-                // Metallic bumper stops at endpoints
-                this.hazardDecorGfx.fillStyle(0x64748b, 1);
-                this.hazardDecorGfx.fillCircle(minX - 6, trackY, 5);
-                this.hazardDecorGfx.fillCircle(maxX + 6, trackY, 5);
-                this.hazardDecorGfx.fillStyle(0x94a3b8, 1);
-                this.hazardDecorGfx.fillCircle(minX - 6, trackY, 2.5);
-                this.hazardDecorGfx.fillCircle(maxX + 6, trackY, 2.5);
-            }
-            this.addHazardWarning(minX);
-        } else {
-            this.addHazardWarning(Math.min(data.x, targetX));
-        }
+        // NOTE: Black track / line removed completely as requested
+        this.addHazardWarning(Math.min(data.x, targetX));
 
         const tween = this.tweens.add({
             targets: hazard,
@@ -2019,15 +2061,7 @@ class GameScene extends Phaser.Scene {
         arcGfx.arc(pivotX, pivotY, ropeLength, Math.PI / 2 - maxAngleRad, Math.PI / 2 + maxAngleRad);
         arcGfx.strokePath();
 
-        // Faint shadow / danger strip on ground surface where saw passes
         const minSwingX = pivotX - Math.sin(maxAngleRad) * ropeLength;
-        const maxSwingX = pivotX + Math.sin(maxAngleRad) * ropeLength;
-        const shadowGfx = this.add.graphics().setDepth(3);
-        shadowGfx.fillStyle(0x000000, 0.32);
-        shadowGfx.fillRoundedRect(minSwingX - 16, 616, (maxSwingX - minSwingX) + 32, 7, 3);
-        shadowGfx.lineStyle(1, 0xf59e0b, 0.3);
-        shadowGfx.strokeRoundedRect(minSwingX - 16, 616, (maxSwingX - minSwingX) + 32, 7, 3);
-
         this.addHazardWarning(minSwingX);
 
         const saw = this.telegraphedHazardsGroup.create(pivotX, pivotY + ropeLength, 'saw');
@@ -2063,12 +2097,10 @@ class GameScene extends Phaser.Scene {
             anchor,
             chainGfx,
             arcGfx,
-            shadowGfx,
             update: updateSwinging,
             cleanup: () => {
                 if (chainGfx) chainGfx.destroy();
                 if (arcGfx) arcGfx.destroy();
-                if (shadowGfx) shadowGfx.destroy();
                 if (anchor) anchor.destroy();
             },
             reset: () => {}
@@ -2442,16 +2474,17 @@ class GameScene extends Phaser.Scene {
         this.player.setVelocityY(0);
         this.isFlipped = !this.isFlipped;
         this.physics.world.gravity.y = this.isFlipped ? -PLAYER.GRAVITY : PLAYER.GRAVITY;
-        this.player.setFlipY(this.isFlipped);
+        this.setPlayerSpriteTexture(this.isFlipped ? 'slime_upside' : 'slime', false);
 
         const launchVelocity = this.isFlipped ? -180 : 180;
         this.player.setVelocityY(launchVelocity);
 
+        this.tweens.killTweensOf(this.player);
         this.tweens.add({
             targets: this.player,
             scaleX: 0.82,
             scaleY: 1.22,
-            duration: 130,
+            duration: Math.round(ANIM.GRAVITY_FLIP_DURATION / 2),
             yoyo: true,
             ease: 'Quad.easeInOut'
         });
@@ -2567,16 +2600,18 @@ class GameScene extends Phaser.Scene {
 
         this.canFlip = this.isInFlipZone && !this.isInLockZone && (isGrounded || hasCoyote) && cooldownReady;
 
-        // Landing squish
+        // Landing squish (ANIM.LAND_SQUASH_DURATION)
         if (isGrounded && this.wasInAir) {
             this.wasInAir = false;
             soundManager.playLand();
-
+            this.landingSquashUntil = time + ANIM.LAND_SQUASH_DURATION;
+            this.setPlayerSpriteTexture('slime_squish', this.isFlipped);
+            this.tweens.killTweensOf(this.player);
             this.tweens.add({
                 targets: this.player,
-                scaleX: 1.15,
-                scaleY: 0.85,
-                duration: 90,
+                scaleX: 1.25,
+                scaleY: 0.75,
+                duration: Math.round(ANIM.LAND_SQUASH_DURATION / 2),
                 yoyo: true,
                 ease: 'Quad.easeOut'
             });
@@ -2603,19 +2638,68 @@ class GameScene extends Phaser.Scene {
             this.player.setVelocityX(Math.max(targetVx, this.player.body.velocity.x - maxDeltaV));
         }
 
-        if (moveLeft) this.player.setFlipX(true);
-        else if (moveRight) this.player.setFlipX(false);
+        if (moveLeft) {
+            this.player.setFlipX(true);
+            if (this.lastMoveDir !== -1) {
+                this.lastMoveDir = -1;
+                this.directionSquashUntil = time + ANIM.DIRECTION_CHANGE_SQUASH;
+            }
+        } else if (moveRight) {
+            this.player.setFlipX(false);
+            if (this.lastMoveDir !== 1) {
+                this.lastMoveDir = 1;
+                this.directionSquashUntil = time + ANIM.DIRECTION_CHANGE_SQUASH;
+            }
+        }
 
-        // 4. Slime visual wobble
-        if (isGrounded && (moveLeft || moveRight)) {
-            const wobble = Math.sin(time * 0.02) * 0.05;
-            this.player.setScale(1 + wobble, 1.0);
-            this.player.setAngle(Math.sin(time * 0.02) * 4);
-        } else if (isGrounded) {
-            this.player.setScale(1.0, 1.0);
+        // 4. Character Animation & Poses (Driven by ANIM constants)
+        if (!isGrounded) {
+            // Mid-air: jump pose
+            this.setPlayerSpriteTexture('slime_jump', this.isFlipped);
             this.player.setAngle(0);
+
+            // Stretch according to vertical velocity
+            const speedNorm = Math.min(1.0, Math.abs(this.player.body.velocity.y) / 600);
+            const stretchY = 1.0 + (ANIM.JUMP_STRETCH_SCALE_Y - 1.0) * speedNorm;
+            const stretchX = 1.0 - (1.0 - ANIM.JUMP_STRETCH_SCALE_X) * speedNorm;
+            this.player.setScale(stretchX, stretchY);
+        } else if (time < this.landingSquashUntil) {
+            // Landing squish active
+            this.setPlayerSpriteTexture('slime_squish', this.isFlipped);
+            this.player.setAngle(0);
+        } else if (time < this.directionSquashUntil) {
+            // Direction turn squash
+            this.setPlayerSpriteTexture(this.isFlipped ? 'slime_upside' : 'slime', false);
+            this.player.setScale(0.88, 1.12);
+            this.player.setAngle(0);
+        } else if (moveLeft || moveRight) {
+            // Ground walk cycle
+            this.setPlayerSpriteTexture(this.isFlipped ? 'slime_upside' : 'slime', false);
+            const stepCycle = (time % (ANIM.WALK_STEP_DURATION * 2)) / (ANIM.WALK_STEP_DURATION * 2);
+            const stepWave = Math.sin(stepCycle * Math.PI * 2);
+            const bobY = 1.0 + 0.05 * Math.abs(stepWave);
+            const bobX = 1.0 - 0.03 * Math.abs(stepWave);
+            this.player.setScale(bobX, bobY);
+            this.player.setAngle(stepWave * 3.5);
         } else {
+            // Idle breathing & natural blinking
+            this.setPlayerSpriteTexture(this.isFlipped ? 'slime_upside' : 'slime', false);
             this.player.setAngle(0);
+
+            if (time > this.nextBlinkTime) {
+                this.blinkUntil = time + ANIM.BLINK_DURATION;
+                this.nextBlinkTime = time + Phaser.Math.Between(ANIM.BLINK_INTERVAL_MIN, ANIM.BLINK_INTERVAL_MAX);
+            }
+
+            if (time < this.blinkUntil) {
+                this.player.setScale(1.04, 0.94);
+            } else {
+                const breathCycle = (time % ANIM.BREATHING_DURATION) / ANIM.BREATHING_DURATION;
+                const breathWave = Math.sin(breathCycle * Math.PI * 2);
+                const breathScaleY = 1.0 + (ANIM.BREATHING_SCALE_Y - 1.0) * breathWave;
+                const breathScaleX = 1.0 - (ANIM.BREATHING_SCALE_Y - 1.0) * breathWave * 0.5;
+                this.player.setScale(breathScaleX, breathScaleY);
+            }
         }
 
         // 5. Jump & Flip Handling (Buffers jump so pressing forward + jump simultaneously ALWAYS executes cleanly!)
@@ -2643,14 +2727,9 @@ class GameScene extends Phaser.Scene {
                 this.player.setVelocityY(vy);
                 soundManager.playJump();
 
-                this.tweens.add({
-                    targets: this.player,
-                    scaleX: 0.85,
-                    scaleY: 1.25,
-                    duration: 110,
-                    yoyo: true,
-                    ease: 'Back.easeOut'
-                });
+                this.setPlayerSpriteTexture('slime_jump', this.isFlipped);
+                this.tweens.killTweensOf(this.player);
+                this.player.setScale(ANIM.JUMP_STRETCH_SCALE_X, ANIM.JUMP_STRETCH_SCALE_Y);
             }
         }
 
@@ -2852,17 +2931,19 @@ class GameScene extends Phaser.Scene {
 
         this.slimeParticles.emitParticleAt(this.player.x, this.player.y, 18);
 
+        this.setPlayerSpriteTexture('slime_squish', this.isFlipped);
+        this.tweens.killTweensOf(this.player);
         this.tweens.add({
             targets: this.player,
             scaleY: 0.1,
             scaleX: 1.5,
             alpha: 0,
-            duration: 200,
+            duration: ANIM.DEATH_FADE_DURATION,
             ease: 'Quad.easeOut'
         });
 
-        // Instant restart in under 1 second (< 280ms)
-        this.time.delayedCall(280, () => {
+        // Instant restart after death fade duration
+        this.time.delayedCall(ANIM.DEATH_FADE_DURATION + 40, () => {
             this.respawnAtLastCheckpoint();
         });
     }
@@ -2874,7 +2955,7 @@ class GameScene extends Phaser.Scene {
         this.player.setPosition(targetX, targetY);
         this.player.setVelocity(0, 0);
         this.player.setAlpha(1);
-        this.player.setScale(1);
+        this.player.setScale(0);
 
         if (this.player.body) {
             this.player.body.enable = true;
@@ -2886,7 +2967,8 @@ class GameScene extends Phaser.Scene {
 
         this.isFlipped = false;
         this.physics.world.gravity.y = PLAYER.GRAVITY;
-        this.player.setFlipY(false);
+        this.setPlayerSpriteTexture('slime', false);
+        this.player.setFlipX(false);
 
         this.isDead = false;
         this.lastFlipTime = 0;
@@ -2896,6 +2978,15 @@ class GameScene extends Phaser.Scene {
         this.resetAllHazards();
         this.checkCurrentZones();
         this.updateGravityUI();
+
+        this.tweens.killTweensOf(this.player);
+        this.tweens.add({
+            targets: this.player,
+            scaleX: 1.0,
+            scaleY: 1.0,
+            duration: ANIM.RESPAWN_DURATION,
+            ease: 'Back.easeOut'
+        });
 
         this.tweens.add({
             targets: this.player,
