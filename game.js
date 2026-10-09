@@ -2595,21 +2595,10 @@ class GameScene extends Phaser.Scene {
 
         this.canFlip = this.isInFlipZone && !this.isInLockZone && (isGrounded || hasCoyote) && cooldownReady;
 
-        // Landing squish (ANIM.LAND_SQUASH_DURATION)
+        // Landing handling (No squash effect)
         if (isGrounded && this.wasInAir) {
             this.wasInAir = false;
             soundManager.playLand();
-            this.landingSquashUntil = time + ANIM.LAND_SQUASH_DURATION;
-            this.setPlayerSpriteTexture('slime_squish', this.isFlipped);
-            this.tweens.killTweensOf(this.player);
-            this.tweens.add({
-                targets: this.player,
-                scaleX: 1.25,
-                scaleY: 0.75,
-                duration: Math.round(ANIM.LAND_SQUASH_DURATION / 2),
-                yoyo: true,
-                ease: 'Quad.easeOut'
-            });
         } else if (!isGrounded) {
             this.wasInAir = true;
         }
@@ -2658,10 +2647,6 @@ class GameScene extends Phaser.Scene {
             const stretchY = 1.0 + (ANIM.JUMP_STRETCH_SCALE_Y - 1.0) * speedNorm;
             const stretchX = 1.0 - (1.0 - ANIM.JUMP_STRETCH_SCALE_X) * speedNorm;
             this.player.setScale(stretchX, stretchY);
-        } else if (time < this.landingSquashUntil) {
-            // Landing squish active
-            this.setPlayerSpriteTexture('slime_squish', this.isFlipped);
-            this.player.setAngle(0);
         } else if (time < this.directionSquashUntil) {
             // Direction turn squash
             this.setPlayerSpriteTexture(this.isFlipped ? 'slime_upside' : 'slime', false);
