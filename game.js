@@ -2469,7 +2469,7 @@ class GameScene extends Phaser.Scene {
         this.player.setVelocityY(0);
         this.isFlipped = !this.isFlipped;
         this.physics.world.gravity.y = this.isFlipped ? -PLAYER.GRAVITY : PLAYER.GRAVITY;
-        this.setPlayerSpriteTexture(this.isFlipped ? 'slime_upside' : 'slime', false);
+        this.setPlayerSpriteTexture('slime', this.isFlipped);
 
         const launchVelocity = this.isFlipped ? -180 : 180;
         this.player.setVelocityY(launchVelocity);
@@ -2636,8 +2636,10 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        // 4. Character Animation & Poses (Driven by ANIM constants)
-        if (!isGrounded) {
+        // 4. Character Animation & Poses (Driven by ANIM constants - 100% flicker-free)
+        const isInAir = this.isJumping || (!this.onSurface && Math.abs(this.player.body.velocity.y) > 75);
+
+        if (isInAir) {
             // Mid-air: jump pose
             this.setPlayerSpriteTexture('slime_jump', this.isFlipped);
             this.player.setAngle(0);
@@ -2647,23 +2649,16 @@ class GameScene extends Phaser.Scene {
             const stretchY = 1.0 + (ANIM.JUMP_STRETCH_SCALE_Y - 1.0) * speedNorm;
             const stretchX = 1.0 - (1.0 - ANIM.JUMP_STRETCH_SCALE_X) * speedNorm;
             this.player.setScale(stretchX, stretchY);
-        } else if (time < this.directionSquashUntil) {
-            // Direction turn squash
-            this.setPlayerSpriteTexture(this.isFlipped ? 'slime_upside' : 'slime', false);
-            this.player.setScale(0.88, 1.12);
-            this.player.setAngle(0);
         } else if (moveLeft || moveRight) {
-            // Ground walk cycle
-            this.setPlayerSpriteTexture(this.isFlipped ? 'slime_upside' : 'slime', false);
+            // Smooth Ground walk cycle (stable scale, zero micro-bouncing)
+            this.setPlayerSpriteTexture('slime', this.isFlipped);
             const stepCycle = (time % (ANIM.WALK_STEP_DURATION * 2)) / (ANIM.WALK_STEP_DURATION * 2);
             const stepWave = Math.sin(stepCycle * Math.PI * 2);
-            const bobY = 1.0 + 0.05 * Math.abs(stepWave);
-            const bobX = 1.0 - 0.03 * Math.abs(stepWave);
-            this.player.setScale(bobX, bobY);
+            this.player.setScale(1.0, 1.0);
             this.player.setAngle(stepWave * 3.5);
         } else {
             // Idle breathing & natural blinking
-            this.setPlayerSpriteTexture(this.isFlipped ? 'slime_upside' : 'slime', false);
+            this.setPlayerSpriteTexture('slime', this.isFlipped);
             this.player.setAngle(0);
 
             if (time > this.nextBlinkTime) {
