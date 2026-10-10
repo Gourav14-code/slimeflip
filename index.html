@@ -221,13 +221,13 @@
         .levels-grid {
             display: flex;
             flex-direction: row;
+            flex-wrap: wrap;
             justify-content: center;
             align-items: stretch;
             gap: 16px;
             width: 100%;
             max-width: 1120px;
             padding: 10px;
-            overflow-x: auto;
             box-sizing: border-box;
         }
 
@@ -518,9 +518,13 @@
             <h1 class="game-title">SLIME FLIP</h1>
             <p class="game-subtitle">GRAVITY PLATFORMER</p>
 
-            <button id="btn-play" class="btn-play-round" aria-label="Play Game" onclick="if(window.UIManager) window.UIManager.openLevelSelect();">
+            <button id="btn-play" class="btn-play-round" aria-label="Play Game" onclick="onPlayButtonClick(event);">
                 <span class="play-icon" style="pointer-events: none;">▶</span>
                 <span class="play-label" style="pointer-events: none;">PLAY</span>
+            </button>
+
+            <button id="btn-select-level" class="btn-secondary" style="margin-top: 14px; font-size: 14px; padding: 10px 24px; border-radius: 20px; font-weight: bold; letter-spacing: 1px; cursor: pointer;" onclick="if(window.UIManager) window.UIManager.openLevelSelect();">
+                ☰ SELECT LEVEL
             </button>
 
             <p class="game-hints">Controls: Arrow Keys / A-D + SPACE / W | Touch Controls</p>
@@ -535,7 +539,37 @@
             </div>
 
             <div id="levels-grid" class="levels-grid">
-                <!-- Dynamically rendered level cards (Levels 1 to 5) -->
+                <!-- Pre-rendered Level Cards (Instant Display) -->
+                <div class="level-card unlocked" onclick="selectGameLevel(0);">
+                    <div class="level-badge">LEVEL 1</div>
+                    <div class="level-num-display">1</div>
+                    <div class="level-card-name">Crystal Cavern</div>
+                    <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
+                </div>
+                <div class="level-card unlocked" onclick="selectGameLevel(1);">
+                    <div class="level-badge">LEVEL 2</div>
+                    <div class="level-num-display">2</div>
+                    <div class="level-card-name">Granite Grotto</div>
+                    <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
+                </div>
+                <div class="level-card unlocked" onclick="selectGameLevel(2);">
+                    <div class="level-badge">LEVEL 3</div>
+                    <div class="level-num-display">3</div>
+                    <div class="level-card-name">Magma Vault</div>
+                    <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
+                </div>
+                <div class="level-card unlocked" onclick="selectGameLevel(3);">
+                    <div class="level-badge">LEVEL 4</div>
+                    <div class="level-num-display">4</div>
+                    <div class="level-card-name">Gravity Citadel</div>
+                    <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
+                </div>
+                <div class="level-card unlocked" onclick="selectGameLevel(4);">
+                    <div class="level-badge">LEVEL 5</div>
+                    <div class="level-num-display">5</div>
+                    <div class="level-card-name">Astral Core</div>
+                    <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
+                </div>
             </div>
         </div>
 
@@ -575,8 +609,66 @@
     </div>
 
     <!-- Game scripts loaded locally (Works completely offline inside Capacitor Android) -->
+    <script>
+        function selectGameLevel(idx) {
+            console.log('[Level Selected]', idx);
+            try {
+                if (window.soundManager) {
+                    window.soundManager.init();
+                    window.soundManager.playClick();
+                }
+            } catch (e) {}
+
+            var overlay = document.getElementById('ui-overlay');
+            if (overlay) overlay.style.display = 'none';
+
+            if (window.UIManager) {
+                window.UIManager.overlayVisible = false;
+                if (window.UIManager.scene && typeof window.UIManager.scene.startLevelFromMenu === 'function') {
+                    window.UIManager.scene.startLevelFromMenu(idx);
+                    return;
+                } else {
+                    window.UIManager.pendingLevelIndex = idx;
+                }
+            }
+
+            if (window.game && window.game.scene) {
+                var gs = window.game.scene.getScene('GameScene');
+                if (gs && typeof gs.startLevelFromMenu === 'function') {
+                    gs.startLevelFromMenu(idx);
+                }
+            }
+        }
+        window.selectGameLevel = selectGameLevel;
+
+        function onPlayButtonClick(e) {
+            if (e) {
+                e.stopPropagation();
+            }
+            console.log('[Play Button] Clicked -> Showing Level Select Screen');
+            try {
+                if (window.soundManager) {
+                    window.soundManager.init();
+                    window.soundManager.playClick();
+                }
+            } catch (err) {}
+
+            var screenStart = document.getElementById('screen-start');
+            var screenSelect = document.getElementById('screen-level-select');
+            var overlay = document.getElementById('ui-overlay');
+            if (overlay) overlay.style.display = 'flex';
+            if (screenStart) screenStart.style.display = 'none';
+            if (screenSelect) screenSelect.style.display = 'flex';
+
+            if (window.UIManager && typeof window.UIManager.openLevelSelect === 'function') {
+                window.UIManager.openLevelSelect();
+            }
+        }
+        window.playGame = onPlayButtonClick;
+    </script>
     <script src="phaser.min.js"></script>
-    <script src="levels.js?v=2.1"></script>
-    <script src="game.js?v=2.1"></script>
+    <script src="assets.js"></script>
+    <script src="levels.js?v=3.6"></script>
+    <script src="game.js?v=3.6"></script>
 </body>
 </html>

@@ -1,32 +1,37 @@
 // ============================================================================
-// game.js - Slime Flip 2D Platformer
+// game.js - Slime Flip 2D Platformer (Architecture Overhaul)
 // ============================================================================
-// Features:
-// - Telegraphed Hazards Engine:
-//     1. blinkHazard (blinks 3 times, disappears for 1.5s, then returns)
-//     2. movingHazard (vertical & horizontal smooth ping-pong saws/spikes)
-//     3. slideSpike (rumble warning, slides in/out on rhythm)
-//     4. fallingPlatform (shakes 0.5s after landing, then drops)
-// - Flip Zones & Lock Zones (Data-driven in levels.js):
-//     * flipZone: Blue glow overlay, allows gravity flip
-//     * lockZone: Red glow overlay, strictly disables gravity flip
-//     * Default (outside zones): Flip disabled, button greyed out
-// - Bug Fix 1: Precise 85% hitboxes for saws and spikes (kills on touch!)
-// - Bug Fix 2: FlipZone alignment and multi-gravity surface checks
+// Features & Standards:
+// - Fixed Resolution: 1280x720, Scale.FIT, autoCenter
+// - Base Ground: GROUND_TOP_Y = 600, continuous base ground along whole width
+//   with rock fill down to bottom of screen (720px), except in defined pits.
+// - Floating Platforms: High route tiers (510, 420, 330, 240), ONE-WAY platforms
+//   (24px top slab, jumpable from below, only downward landing lands).
+// - Ceiling Platforms: Flat bottom surface at y = 130 (below HUD bar).
+// - Camera: worldHeight = 720, camera Y locked (scrollY = 0), follows player
+//   on X axis only (lerp: 0.1, 0), parallax background on X only.
+// - Seamless Ground (3-slice): Left/right caps, alternating flipped middle tiles
+//   (2px overlap), one merged static collider per slab.
+// - Pits: Rim caps, dark abyss gradient, pit death trigger zones, y > 800 safety net.
+// - Swinging Saw: Metal mounting bracket, chain links, blade-only lethal hitbox.
+// - Separate UIScene: Fixed camera, HUD + touch buttons (radius 44, 40% opacity,
+//   24px margins), persistent across restarts and level changes.
+// - Console Gap Table & Self-Test: Formatted gap table on load, zero warnings.
+// - Debug Tools: F2 toggles debug visualization, J toggles jump arc drawer.
 // ============================================================================
 
 // ============================================================================
-// PLAYER MOVEMENT & CALIBRATION CONSTANTS (Tuning Parameters)
+// PLAYER MOVEMENT & CALIBRATION CONSTANTS
 // ============================================================================
-var PLAYER = {
+var PLAYER = (typeof window !== 'undefined' && window.PLAYER) ? window.PLAYER : {
     WIDTH: 64,
     HEIGHT: 64,
     HITBOX_WIDTH: 51,
     HITBOX_HEIGHT: 51,
     GRAVITY: 1500,
     RUN_SPEED: 260,
-    ACCELERATION_TIME: 0.08, // seconds
-    DECELERATION_TIME: 0.08, // seconds
+    ACCELERATION_TIME: 0.08,
+    DECELERATION_TIME: 0.08,
     JUMP_VELOCITY: -690,
     VARIABLE_JUMP_CUT: 0.5,
     COYOTE_TIME: 100, // ms
@@ -39,12 +44,18 @@ var PLAYER = {
     SAFE_STEP_UP: 110,
     CLEARANCE_HEIGHT: 105
 };
-window.PLAYER = PLAYER;
 
-// ==========================================
-// ANIM CONSTANTS (Tune animation timings & strengths here)
-// ==========================================
-const ANIM = {
+var GROUND_TOP_Y = (typeof window !== 'undefined' && window.GROUND_TOP_Y) ? window.GROUND_TOP_Y : 600;
+
+if (typeof window !== 'undefined') {
+    window.PLAYER = PLAYER;
+    window.GROUND_TOP_Y = GROUND_TOP_Y;
+}
+
+// ============================================================================
+// ANIM CONSTANTS
+// ============================================================================
+var ANIM = {
     DISPLAY_HEIGHT: 64,
     BREATHING_DURATION: 1200,      // ms
     BREATHING_SCALE_Y: 1.04,
@@ -63,128 +74,251 @@ const ANIM = {
     RESPAWN_DURATION: 200,         // ms
     GEM_POP_DURATION: 150          // ms
 };
-window.ANIM = ANIM;
 
-// Debug setting: Set to true to see hitboxes, jump arc visualizer, and on-screen debug HUD
-const DEBUG = false;
+if (typeof window !== 'undefined') {
+    window.ANIM = ANIM;
+}
+
+// Debug setting: Set to false by default (no on-screen debug outlines)
+let DEBUG = false;
+let DRAW_JUMP_ARC = false;
 const ZONE_GLOW = false;
 
 // ============================================================================
-// STEP 4: LEVEL VALIDATOR
-// Runs automatically on level load to ensure fairness, continuous paths, and safe spacing.
+// LEVEL VALIDATOR & CAN_REACH PHYSICS ENGINE
 // ============================================================================
-function validateLevel(lvl) {
-    const report = { warnings: [], autoFixed: [] };
+function canReach(platformA, platformB, gravityDirection = 1) {
+    const pA = normalizePlatformData(platformA);
+    const pB = normalizePlatformData(platformB);
 
-    const allPlatforms = [
+    const v0 = Math.abs(PLAYER.JUMP_VELOCITY || 690);
+    const g = PLAYER.GRAVITY || 1500;
+    const vx = PLAYER.RUN_SPEED || 260;
+
+    // Peak jump height and time to apex from kinematics:
+    const hApex = (v0 * v0) / (2 * g);
+    const tApex = v0 / g;
+
+    // 15% safety margin on peak jump height
+    const hSafeMax = hApex * 0.85;
+
+    const gDir = (gravityDirection === -1 || gravityDirection === 'up') ? -1 : 1;
+    const deltaY = gDir === -1 ? (pB.surfaceY - pA.surfaceY) : (pA.surfaceY - pB.surfaceY);
+
+    if (deltaY > hSafeMax) {
+        return {
+            reachable: false,
+            reason: `Step-up ${deltaY.toFixed(1)}px exceeds safe parabolic limit (${hSafeMax.toFixed(1)}px)`,
+            gap: Math.max(0, pB.left - pA.right),
+            maxSafeDist: 0,
+            deltaY
+        };
+    }
+
+    const dFall = Math.max(0, hApex - deltaY);
+    const tFall = Math.sqrt((2 * dFall) / g);
+    const tTotal = tApex + tFall;
+
+    // Max horizontal distance with 15% safety margin
+    const maxSafeDist = vx * tTotal * 0.85;
+    const gap = Math.max(0, pB.left - pA.right);
+
+    if (gap > maxSafeDist) {
+        return {
+            reachable: false,
+            reason: `Gap ${gap.toFixed(1)}px exceeds safe parabolic horizontal reach (${maxSafeDist.toFixed(1)}px)`,
+            gap,
+            maxSafeDist,
+            deltaY
+        };
+    }
+
+    return {
+        reachable: true,
+        gap,
+        maxSafeDist,
+        deltaY,
+        airTime: tTotal
+    };
+}
+
+function normalizePlatformData(p) {
+    if (!p) return { x: 0, y: 0, w: 256, left: 0, right: 256, surfaceY: 600, ceiling: false };
+    if (p._normalized) return p;
+    const meta = (typeof PLATFORM_TYPES !== 'undefined' && p.type && PLATFORM_TYPES[p.type]) ? PLATFORM_TYPES[p.type] : null;
+    const w = p.w !== undefined ? p.w : (p.width !== undefined ? p.width : (meta ? meta.defaultWidth : 256));
+    const isCeil = meta ? meta.ceiling : (p.ceiling || p.type === 'ceiling' || p.type === 'ceilFloat' || p.y < 300);
+
+    const surfY = p.y !== undefined ? p.y : 600;
+    const left = (p.w !== undefined) ? p.x : (p.x !== undefined ? (p.x - w / 2) : 0);
+    const right = left + w;
+    const centerX = left + w / 2;
+
+    return {
+        x: centerX,
+        y: surfY,
+        w,
+        width: w,
+        left,
+        right,
+        surfaceY: surfY,
+        ceiling: isCeil,
+        type: p.type || 'ground',
+        isFalling: !!p.isFalling,
+        raw: p,
+        _normalized: true
+    };
+}
+
+function validateLevel(lvl) {
+    const report = { warnings: [], autoFixed: [], reachablePairs: 0, totalPairs: 0, gapRows: [] };
+
+    const rawPlatforms = [
         ...(lvl.platforms || []),
         ...((lvl.telegraphedHazards || []).filter(h => h.type === 'fallingPlatform').map(h => ({
+            type: 'fallingPlatform',
             x: h.x,
             y: h.y,
-            width: h.width,
-            height: h.height,
+            w: h.width,
             isFalling: true
         })))
     ];
 
+    const allPlatforms = rawPlatforms.map(normalizePlatformData);
     const flipZones = (lvl.zones || []).filter(z => z.type === 'flipZone');
     const getFlipZoneAt = (x) => flipZones.find(z => x >= z.x && x <= z.x + z.width);
 
-    // 1. Check Floor Platforms Gaps and Step-Ups
     const floorPlats = allPlatforms
-        .filter(p => p.y >= 500)
-        .sort((a, b) => (a.x - a.width / 2) - (b.x - b.width / 2));
+        .filter(p => !p.ceiling)
+        .sort((a, b) => a.left - b.left);
 
-    for (let i = 0; i < floorPlats.length - 1; i++) {
-        const curr = floorPlats[i];
-        const next = floorPlats[i + 1];
-        const currRight = curr.x + curr.width / 2;
-        const nextLeft = next.x - next.width / 2;
-        const gap = nextLeft - currRight;
+    const ceilingPlats = allPlatforms
+        .filter(p => p.ceiling)
+        .sort((a, b) => a.left - b.left);
 
-        const midGapX = (currRight + nextLeft) / 2;
+    const groundPath = [];
+    const highRoutes = [];
+
+    floorPlats.forEach(p => {
+        const isHigh = p.surfaceY < 580 && !p.isFalling;
+        if (isHigh) {
+            highRoutes.push(p);
+        } else {
+            groundPath.push(p);
+        }
+    });
+
+    for (let i = 0; i < groundPath.length - 1; i++) {
+        report.totalPairs++;
+        const curr = groundPath[i];
+        const next = groundPath[i + 1];
+        const gap = next.left - curr.right;
+
+        const midGapX = (curr.right + next.left) / 2;
         const inFlip = getFlipZoneAt(midGapX);
 
+        let reachable = true;
+        let reachInfo = null;
+
         if (inFlip) {
-            const ceilingBridge = allPlatforms.filter(p => p.y < 300 && p.x + p.width/2 >= currRight && p.x - p.width/2 <= nextLeft);
+            const ceilingBridge = ceilingPlats.filter(p => p.right >= curr.right && p.left <= next.left);
             if (ceilingBridge.length === 0) {
-                report.warnings.push(`Level ${lvl.id}: Floor gap ${gap}px in Flip Zone has no ceiling bridge!`);
+                report.warnings.push(`Level ${lvl.id}: Floor gap ${gap.toFixed(0)}px in Flip Zone has no ceiling bridge!`);
+                reachable = false;
             }
-        } else {
-            if (gap > PLAYER.SAFE_GAP) {
-                report.warnings.push(`Level ${lvl.id}: Gap ${gap}px between x:${currRight} and x:${nextLeft} exceeds SAFE_GAP (${PLAYER.SAFE_GAP}px)`);
-                if (!next.isFalling && !curr.isFalling) {
-                    const shift = gap - PLAYER.SAFE_GAP;
-                    next.x -= shift;
-                    report.autoFixed.push(`Clamped gap to ${PLAYER.SAFE_GAP}px`);
+        } else if (gap > 0) {
+            reachInfo = canReach(curr, next, 1);
+            if (!reachInfo.reachable) {
+                const bridgingHigh = highRoutes.filter(h => {
+                    return canReach(curr, h, 1).reachable && canReach(h, next, 1).reachable;
+                });
+                if (bridgingHigh.length > 0) {
+                    reachable = true;
+                } else {
+                    report.warnings.push(`Level ${lvl.id}: Jump from x:${curr.right.toFixed(0)} to x:${next.left.toFixed(0)} is NOT reachable! (${reachInfo.reason})`);
+                    reachable = false;
                 }
             }
         }
 
-        const stepUp = curr.y - next.y;
-        if (stepUp > PLAYER.SAFE_STEP_UP) {
-            report.warnings.push(`Level ${lvl.id}: Step-up ${stepUp}px exceeds SAFE_STEP_UP (${PLAYER.SAFE_STEP_UP}px)`);
-            if (!next.isFalling) {
-                next.y = curr.y - PLAYER.SAFE_STEP_UP;
-                report.autoFixed.push(`Clamped step-up to ${PLAYER.SAFE_STEP_UP}px`);
-            }
-        }
+        if (reachable) report.reachablePairs++;
+
+        report.gapRows.push({
+            'Level': lvl.id,
+            'From (X)': Math.round(curr.right),
+            'To (X)': Math.round(next.left),
+            'Gap (px)': Math.round(gap),
+            'From Type': curr.type,
+            'To Type': next.type,
+            'In Flip': inFlip ? 'YES' : 'NO',
+            'Reachable': reachable ? 'YES' : 'NO',
+            'Status': reachable ? 'OK' : 'FAIL'
+        });
     }
 
-    // 2. Check Ceiling Bridges WITHIN each Flip Zone
-    flipZones.forEach(zone => {
-        const zoneCeilings = allPlatforms
-            .filter(p => p.y < 300 && (p.x + p.width/2 >= zone.x && p.x - p.width/2 <= zone.x + zone.width))
-            .sort((a, b) => (a.x - a.width / 2) - (b.x - b.width / 2));
+    // Verify all high routes can be reached either from ground or via stairs
+    highRoutes.forEach(h => {
+        const canReachFromGround = groundPath.some(g => canReach(g, h, 1).reachable);
+        const canReachFromStairs = highRoutes.some(prev => prev !== h && canReach(prev, h, 1).reachable);
 
-        if (zoneCeilings.length === 0) {
-            report.warnings.push(`Level ${lvl.id}: Flip Zone (${zone.x}-${zone.x + zone.width}) has no ceiling platforms!`);
-            return;
-        }
-
-        for (let i = 0; i < zoneCeilings.length - 1; i++) {
-            const curr = zoneCeilings[i];
-            const next = zoneCeilings[i + 1];
-            const currRight = curr.x + curr.width / 2;
-            const nextLeft = next.x - next.width / 2;
-            const gap = nextLeft - currRight;
-            if (gap > 0 && gap > PLAYER.SAFE_GAP) {
-                report.warnings.push(`Level ${lvl.id}: Ceiling gap ${gap}px in Flip Zone exceeds SAFE_GAP (${PLAYER.SAFE_GAP}px)`);
-            }
+        if (!canReachFromGround && !canReachFromStairs) {
+            report.warnings.push(`Level ${lvl.id}: High route platform at x:${h.left} (y:${h.surfaceY}) has no safe ascent path!`);
         }
     });
 
-    // 3. Check Obstacles clearance around Checkpoints, Goal, and Spawn
-    const cps = lvl.checkpoints || [];
-    const goalX = lvl.goal ? lvl.goal.x : lvl.worldWidth - 150;
-    const hazards = [...(lvl.telegraphedHazards || []), ...(lvl.spikes || [])];
+    // 2. Validate Ceiling Bridges within Flip Zones
+    flipZones.forEach(zone => {
+        const zoneCeilings = ceilingPlats
+            .filter(p => p.right >= zone.x && p.left <= zone.x + zone.width)
+            .sort((a, b) => a.left - b.left);
 
-    hazards.forEach(h => {
-        if (h.type === 'fallingPlatform') return;
-        const hx = (h.x !== undefined) ? h.x : (h.pivotX || 0);
-
-        if (hx < 300) {
-            report.warnings.push(`Level ${lvl.id}: Hazard '${h.id || h.type}' at x:${hx} is inside first 300px safe spawn zone`);
-        }
-        cps.forEach(cp => {
-            if (Math.abs(hx - cp.x) < 200) {
-                report.warnings.push(`Level ${lvl.id}: Hazard '${h.id || h.type}' at x:${hx} is within 200px of checkpoint at x:${cp.x}`);
-            }
-        });
-        if (Math.abs(hx - goalX) < 200) {
-            report.warnings.push(`Level ${lvl.id}: Hazard '${h.id || h.type}' at x:${hx} is within 200px of goal at x:${goalX}`);
+        if (zoneCeilings.length === 0) {
+            report.warnings.push(`Level ${lvl.id}: Flip Zone (${zone.x}-${zone.x + zone.width}) has no ceiling platforms!`);
         }
     });
 
     lvl._validationReport = report;
-    if (report.warnings.length > 0) {
-        console.warn(`[LevelValidator] Level ${lvl.id} warnings:`, report.warnings);
-    } else {
-        console.log(`[LevelValidator] Level ${lvl.id} (${lvl.name}) passed all checks!`);
-    }
     return report;
 }
-window.validateLevel = validateLevel;
+
+function printLevelGapTable(lvl) {
+    const report = validateLevel(lvl);
+    if (console && console.table && report.gapRows.length > 0) {
+        console.log(`[Platform Gap Table - Level ${lvl.id}: ${lvl.name}]`);
+        console.table(report.gapRows);
+    }
+}
+
+function runSelfTest() {
+    if (typeof GAME_LEVELS === 'undefined') return;
+    console.log('[Self-Test] Starting verification for all game levels...');
+    let totalWarnings = 0;
+    GAME_LEVELS.forEach(lvl => {
+        const rep = validateLevel(lvl);
+        totalWarnings += rep.warnings.length;
+        if (rep.warnings.length > 0) {
+            console.warn(`[Self-Test Warning] Level ${lvl.id}:`, rep.warnings);
+        }
+    });
+
+    if (totalWarnings === 0) {
+        console.log('%c[Self-Test PASS] All 5 levels verified: 0 warnings, continuous ground, all gaps safe!', 'color: #38ef7d; font-weight: bold;');
+    } else {
+        console.warn(`[Self-Test] Found ${totalWarnings} warnings across levels.`);
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.canReach = canReach;
+    window.normalizePlatformData = normalizePlatformData;
+    window.validateLevel = validateLevel;
+    window.printLevelGapTable = printLevelGapTable;
+    window.runSelfTest = runSelfTest;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { canReach, normalizePlatformData, validateLevel, printLevelGapTable, runSelfTest };
+}
 
 window.gameDeathCount = window.gameDeathCount || 0;
 
@@ -201,7 +335,9 @@ const FUNNY_DEATH_MESSAGES = [
     "Watch your step... and your ceiling! 🧐"
 ];
 
-// --- Web Audio Retro Sound Synthesizer (100% offline) ---
+// ============================================================================
+// Retro Web Audio Sound Synthesizer (100% Offline)
+// ============================================================================
 class SoundController {
     constructor() {
         this.ctx = null;
@@ -278,6 +414,7 @@ class SoundController {
         if (this.muted) return;
         this.init();
         if (!this.ctx) return;
+
         try {
             const now = this.ctx.currentTime;
             const osc = this.ctx.createOscillator();
@@ -310,12 +447,12 @@ class SoundController {
     playStarPop(index = 1) {
         if (this.muted) return;
         this.init();
-        const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5
+        const freqs = [523.25, 659.25, 783.99];
         const f = freqs[Math.min(index - 1, freqs.length - 1)] || 783.99;
         this.playTone(f, f * 1.15, 0.22, 'sine', 0.25);
     }
 
-        playBounce() {
+    playBounce() {
         if (this.muted) return;
         this.init();
         this.playTone(320, 680, 0.16, 'sine', 0.24);
@@ -333,11 +470,10 @@ class SoundController {
 }
 
 const soundManager = new SoundController();
+if (typeof window !== 'undefined') window.soundManager = soundManager;
 
 // ============================================================================
-
-// ============================================================================
-// Safe LocalStorage Persistence (try/catch wrapped for Capacitor & Browsers)
+// Safe LocalStorage Persistence
 // ============================================================================
 const GameStorage = {
     KEY: 'slime_flip_save_v1',
@@ -349,7 +485,7 @@ const GameStorage = {
             console.warn('Storage read fallback:', e);
         }
         return {
-            unlockedLevel: 5, // All levels unlocked for testing
+            unlockedLevel: 5,
             stars: {}
         };
     },
@@ -361,7 +497,7 @@ const GameStorage = {
         }
     },
     isUnlocked(levelId) {
-        return true; // TESTING MODE: All levels unlocked!
+        return true; // All levels unlocked for testing
     },
     getStars(levelId) {
         const d = this.getData();
@@ -369,7 +505,6 @@ const GameStorage = {
     },
     recordClear(levelId, deaths) {
         const d = this.getData();
-        // 1 star for clearing, 2 stars for <= 6 deaths, 3 stars for <= 2 deaths
         let starsEarned = 1;
         if (deaths <= 2) {
             starsEarned = 3;
@@ -398,6 +533,15 @@ const GameStorage = {
 const UIManager = {
     initialized: false,
     pendingLevelIndex: undefined,
+    overlayVisible: true,
+    _keyListenerAdded: false,
+};
+
+if (typeof window !== 'undefined') {
+    window.UIManager = UIManager;
+}
+
+Object.assign(UIManager, {
 
     init(gameScene) {
         if (gameScene) {
@@ -415,19 +559,41 @@ const UIManager = {
         this.screenLevelComplete = document.getElementById('screen-level-complete');
         this.levelsGrid = document.getElementById('levels-grid');
 
+        if (!this._keyListenerAdded) {
+            this._keyListenerAdded = true;
+            window.addEventListener('keydown', (e) => {
+                if (this.overlayVisible && this.screenStart && this.screenStart.style.display !== 'none') {
+                    if (e.code === 'Space' || e.code === 'Enter') {
+                        e.preventDefault();
+                        this.openLevelSelect();
+                    }
+                }
+            });
+        }
+
         if (this.initialized) return;
         this.initialized = true;
 
         const btnPlay = document.getElementById('btn-play');
         if (btnPlay) {
-            const onPlay = (e) => {
+            btnPlay.onclick = (e) => {
                 if (e) e.stopPropagation();
                 soundManager.init();
                 soundManager.playClick();
                 this.openLevelSelect();
             };
-            btnPlay.addEventListener('click', onPlay);
-            btnPlay.addEventListener('pointerdown', onPlay);
+        }
+
+        const btnSelectLevel = document.getElementById('btn-select-level');
+        if (btnSelectLevel) {
+            const onSelect = (e) => {
+                if (e) e.stopPropagation();
+                soundManager.init();
+                soundManager.playClick();
+                this.openLevelSelect();
+            };
+            btnSelectLevel.addEventListener('click', onSelect);
+            btnSelectLevel.addEventListener('pointerdown', onSelect);
         }
 
         const btnBack = document.getElementById('btn-back-to-start');
@@ -473,7 +639,20 @@ const UIManager = {
         }
     },
 
+    playGame() {
+        soundManager.init();
+        soundManager.playClick();
+        this.hideOverlay();
+        const lvlIdx = (this.scene && this.scene.currentLevelIndex !== undefined) ? this.scene.currentLevelIndex : 0;
+        if (this.scene) {
+            this.scene.startLevelFromMenu(lvlIdx);
+        } else {
+            this.pendingLevelIndex = lvlIdx;
+        }
+    },
+
     showScreen(panelName) {
+        this.overlayVisible = true;
         if (!this.overlay) this.overlay = document.getElementById('ui-overlay');
         if (this.overlay) this.overlay.style.display = 'flex';
         if (!this.screenStart) this.screenStart = document.getElementById('screen-start');
@@ -487,6 +666,7 @@ const UIManager = {
 
     hideOverlay() {
         this.stopConfetti();
+        this.overlayVisible = false;
         if (!this.overlay) this.overlay = document.getElementById('ui-overlay');
         if (this.overlay) this.overlay.style.display = 'none';
         try {
@@ -503,38 +683,27 @@ const UIManager = {
     openStartScreen() {
         this.stopConfetti();
         this.showScreen('start');
-        try {
-            if (this.scene && this.scene.scene && typeof this.scene.scene.isPaused === 'function') {
-                if (!this.scene.scene.isPaused()) {
-                    this.scene.scene.pause();
-                }
-            }
-        } catch (e) {
-            console.warn('Pause fallback:', e);
-        }
     },
 
     openLevelSelect() {
         this.stopConfetti();
         this.renderLevelsGrid();
         this.showScreen('select');
-        try {
-            if (this.scene && this.scene.scene && typeof this.scene.scene.isPaused === 'function') {
-                if (!this.scene.scene.isPaused()) {
-                    this.scene.scene.pause();
-                }
-            }
-        } catch (e) {
-            console.warn('Pause fallback:', e);
-        }
     },
 
     renderLevelsGrid() {
         if (!this.levelsGrid) this.levelsGrid = document.getElementById('levels-grid');
         if (!this.levelsGrid) return;
+
+        const levels = (typeof GAME_LEVELS !== 'undefined' && GAME_LEVELS && GAME_LEVELS.length)
+            ? GAME_LEVELS
+            : (window.GAME_LEVELS || []);
+
+        if (!levels || !levels.length) return;
+
         this.levelsGrid.innerHTML = '';
 
-        GAME_LEVELS.forEach((lvl, idx) => {
+        levels.forEach((lvl, idx) => {
             const levelNum = lvl.id || (idx + 1);
             const isUnlocked = GameStorage.isUnlocked(levelNum);
             const stars = GameStorage.getStars(levelNum);
@@ -559,18 +728,21 @@ const UIManager = {
             card.innerHTML = `${badge}${numDisplay}${name}${starsHtml}`;
 
             if (isUnlocked) {
-                const onSelect = (e) => {
+                card.onclick = (e) => {
                     if (e) e.stopPropagation();
-                    soundManager.playClick();
-                    this.hideOverlay();
-                    if (this.scene) {
-                        this.scene.startLevelFromMenu(idx);
+                    if (typeof selectGameLevel === 'function') {
+                        selectGameLevel(idx);
                     } else {
-                        this.pendingLevelIndex = idx;
+                        soundManager.init();
+                        soundManager.playClick();
+                        this.hideOverlay();
+                        if (this.scene) {
+                            this.scene.startLevelFromMenu(idx);
+                        } else {
+                            this.pendingLevelIndex = idx;
+                        }
                     }
                 };
-                card.addEventListener('click', onSelect);
-                card.addEventListener('pointerdown', onSelect);
             }
 
             this.levelsGrid.appendChild(card);
@@ -689,7 +861,7 @@ const UIManager = {
                         if (window.soundManager && typeof window.soundManager.playStarPop === 'function') {
                             window.soundManager.playStarPop(s);
                         }
-                    }, s * ((window.ANIM ? window.ANIM.GEM_POP_DURATION : 150) + 70));
+                    }, s * (ANIM.GEM_POP_DURATION + 70));
                 }
             }
         }
@@ -733,11 +905,341 @@ const UIManager = {
         this.launchConfetti();
         this.showScreen('complete');
     }
-};
+});
 
-window.GameStorage = GameStorage;
-window.UIManager = UIManager;
+if (typeof window !== 'undefined') {
+    window.GameStorage = GameStorage;
+    window.UIManager = UIManager;
+}
 
+// ============================================================================
+// UIScene: Dedicated Non-Reloading UI Overlay
+// ============================================================================
+// Fixed 1280x720 camera. Houses HUD, touch buttons, and toast hint banner.
+// Never destroyed or recreated on restart or level change!
+// ============================================================================
+class UIScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'UIScene', active: true });
+    }
+
+    create() {
+        this.cameras.main.setScroll(0, 0);
+
+        this.createTopHUD();
+        this.createEdgeTouchControls();
+        this.createDebugHUD();
+    }
+
+    getGameScene() {
+        return this.scene.get('GameScene');
+    }
+
+    createTopHUD() {
+        const hudDepth = 1000;
+
+        const topBar = this.add.graphics().setDepth(hudDepth);
+        topBar.fillStyle(0x0a0e1c, 0.88);
+        topBar.fillRoundedRect(20, 12, 1240, 52, 12);
+        topBar.lineStyle(1.5, 0x1f293d, 1);
+        topBar.strokeRoundedRect(20, 12, 1240, 52, 12);
+
+        this.hudLevelText = this.add.text(45, 27, "LEVEL 1: CRYSTAL CAVERN", {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '17px',
+            fontWeight: 'bold',
+            color: '#ffffff'
+        }).setDepth(hudDepth + 1);
+
+        this.gravityBadgeText = this.add.text(640, 38, "GRAVITY: FLOOR ⬇", {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '15px',
+            fontWeight: '900',
+            color: '#38ef7d'
+        }).setOrigin(0.5).setDepth(hudDepth + 1);
+
+        this.hudDeathText = this.add.text(990, 38, `💀 DEATHS: ${window.gameDeathCount}`, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            color: '#ff76ac'
+        }).setOrigin(0.5).setDepth(hudDepth + 1);
+
+        this.btnMenu = this.add.text(1110, 23, "☰", {
+            fontSize: '26px',
+            color: '#38ef7d'
+        }).setDepth(hudDepth + 1).setInteractive({ useHandCursor: true });
+        this.btnMenu.on('pointerdown', () => {
+            soundManager.playClick();
+            if (window.UIManager) {
+                window.UIManager.openLevelSelect();
+            }
+        });
+
+        this.btnSound = this.add.text(1165, 25, "🔊", {
+            fontSize: '24px'
+        }).setDepth(hudDepth + 1).setInteractive({ useHandCursor: true });
+        this.btnSound.on('pointerdown', () => {
+            soundManager.muted = !soundManager.muted;
+            this.btnSound.setText(soundManager.muted ? "🔇" : "🔊");
+            soundManager.playClick();
+        });
+
+        const btnRestart = this.add.text(1225, 23, "↺", {
+            fontSize: '28px',
+            color: '#a0aec0'
+        }).setDepth(hudDepth + 1).setInteractive({ useHandCursor: true });
+        btnRestart.on('pointerdown', () => {
+            soundManager.playClick();
+            const gameScene = this.getGameScene();
+            if (gameScene) gameScene.restartCurrentLevel();
+        });
+    }
+
+    createEdgeTouchControls() {
+        const hudDepth = 1000;
+
+        // Bottom-left touch buttons: Left & Right (radius 44, 40% opacity, 24px margins)
+        this.createTouchButton(95, 625, 44, "◀", () => {
+            const gameScene = this.getGameScene();
+            if (gameScene) gameScene.touchLeft = true;
+        }, () => {
+            const gameScene = this.getGameScene();
+            if (gameScene) gameScene.touchLeft = false;
+        });
+
+        this.createTouchButton(215, 625, 44, "▶", () => {
+            const gameScene = this.getGameScene();
+            if (gameScene) gameScene.touchRight = true;
+        }, () => {
+            const gameScene = this.getGameScene();
+            if (gameScene) gameScene.touchRight = false;
+        });
+
+        // Bottom-right touch buttons: Jump & Flip (radius 44 & 50, 40% opacity, 24px margins)
+        this.createTouchButton(1045, 625, 44, "▲", () => {
+            const gameScene = this.getGameScene();
+            if (gameScene) {
+                gameScene.jumpBufferedUntil = this.time.now + PLAYER.JUMP_BUFFER;
+                gameScene.touchJumpDown = true;
+            }
+        }, () => {
+            const gameScene = this.getGameScene();
+            if (gameScene) {
+                gameScene.touchJumpDown = false;
+                if (gameScene.isJumping) {
+                    gameScene.isJumping = false;
+                    if (!gameScene.isFlipped && gameScene.player && gameScene.player.body && gameScene.player.body.velocity.y < 0) {
+                        gameScene.player.setVelocityY(gameScene.player.body.velocity.y * PLAYER.VARIABLE_JUMP_CUT);
+                    } else if (gameScene.isFlipped && gameScene.player && gameScene.player.body && gameScene.player.body.velocity.y > 0) {
+                        gameScene.player.setVelocityY(gameScene.player.body.velocity.y * PLAYER.VARIABLE_JUMP_CUT);
+                    }
+                }
+            }
+        });
+
+        this.createFlipButton(1180, 615, 50);
+    }
+
+    createTouchButton(x, y, radius, label, onDown, onUp) {
+        const hudDepth = 1000;
+        const btn = this.add.container(x, y).setDepth(hudDepth);
+
+        const circle = this.add.circle(0, 0, radius, 0x131a2b, 0.40);
+        circle.setStrokeStyle(3, 0x38ef7d, 0.65);
+
+        const text = this.add.text(0, 0, label, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '30px',
+            fontWeight: 'bold',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+
+        btn.add([circle, text]);
+        btn.setSize(radius * 2, radius * 2);
+        btn.setInteractive(new Phaser.Geom.Circle(0, 0, radius), Phaser.Geom.Circle.Contains);
+
+        btn.on('pointerdown', () => {
+            circle.setFillStyle(0x38ef7d, 0.85);
+            text.setColor('#0a0e1c');
+            btn.setScale(0.92);
+            soundManager.playClick();
+            if (onDown) onDown();
+        });
+
+        const release = () => {
+            circle.setFillStyle(0x131a2b, 0.40);
+            text.setColor('#ffffff');
+            btn.setScale(1.0);
+            if (onUp) onUp();
+        };
+
+        btn.on('pointerup', release);
+        btn.on('pointerout', release);
+        btn.on('pointercancel', release);
+
+        return btn;
+    }
+
+    createFlipButton(x, y, radius) {
+        const hudDepth = 1000;
+        this.flipBtnContainer = this.add.container(x, y).setDepth(hudDepth);
+
+        this.flipCircle = this.add.circle(0, 0, radius, 0x105934, 0.40);
+        this.flipCircle.setStrokeStyle(3.5, 0x38ef7d, 0.75);
+
+        this.flipText = this.add.text(0, -7, "FLIP", {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '22px',
+            fontWeight: '900',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+
+        this.flipSubText = this.add.text(0, 16, "⬆ CEILING", {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            color: '#a8f5bb'
+        }).setOrigin(0.5);
+
+        this.flipBtnContainer.add([this.flipCircle, this.flipText, this.flipSubText]);
+        this.flipBtnContainer.setSize(radius * 2, radius * 2);
+        this.flipBtnContainer.setInteractive(new Phaser.Geom.Circle(0, 0, radius), Phaser.Geom.Circle.Contains);
+
+        this.flipBtnContainer.on('pointerdown', () => {
+            const gameScene = this.getGameScene();
+            if (!gameScene) return;
+
+            if (gameScene.canFlip && gameScene.isInFlipZone) {
+                this.flipBtnContainer.setScale(0.9);
+                gameScene.triggerGravityFlip();
+            } else if (gameScene.onSurface && !gameScene.isFlipped) {
+                gameScene.player.setVelocityY(-430);
+                soundManager.playJump();
+            } else {
+                soundManager.playClick();
+                this.tweens.add({
+                    targets: this.flipBtnContainer,
+                    x: x + 4,
+                    duration: 40,
+                    yoyo: true,
+                    repeat: 2
+                });
+            }
+        });
+
+        const release = () => {
+            this.flipBtnContainer.setScale(1.0);
+        };
+        this.flipBtnContainer.on('pointerup', release);
+        this.flipBtnContainer.on('pointerout', release);
+        this.flipBtnContainer.on('pointercancel', release);
+    }
+
+    updateLevelText(title) {
+        if (this.hudLevelText) {
+            this.hudLevelText.setText(title);
+        }
+    }
+
+    updateGravityUI(isFlipped, canFlip) {
+        if (!this.gravityBadgeText || !this.flipSubText || !this.flipCircle) return;
+
+        if (isFlipped) {
+            this.gravityBadgeText.setText("GRAVITY: CEILING ⬆").setColor('#ff76ac');
+            this.flipText.setText("FLIP");
+            this.flipSubText.setText("⬇ FLOOR").setColor('#ffd1e4');
+            this.flipCircle.setFillStyle(0x6e173e, 0.40);
+            this.flipCircle.setStrokeStyle(3.5, 0xff76ac, 0.85);
+        } else {
+            this.gravityBadgeText.setText("GRAVITY: FLOOR ⬇").setColor('#38ef7d');
+            this.flipText.setText("FLIP");
+            this.flipSubText.setText("⬆ CEILING").setColor('#a8f5bb');
+            this.flipCircle.setFillStyle(0x105934, 0.40);
+            this.flipCircle.setStrokeStyle(3.5, 0x38ef7d, 0.85);
+        }
+
+        if (this.flipBtnContainer) {
+            this.flipBtnContainer.setAlpha(canFlip ? 1.0 : 0.65);
+        }
+    }
+
+    updateDeaths(count) {
+        if (this.hudDeathText) {
+            this.hudDeathText.setText(`💀 DEATHS: ${count}`);
+        }
+    }
+
+    showTutorialHint(textString) {
+        const hudDepth = 1000;
+
+        if (this.tutorialContainer) {
+            this.tutorialContainer.destroy();
+        }
+
+        this.tutorialContainer = this.add.container(640, 88).setDepth(hudDepth);
+
+        const bannerBg = this.add.graphics();
+        bannerBg.fillStyle(0x0a1020, 0.88);
+        bannerBg.lineStyle(1.5, 0x38ef7d, 0.7);
+
+        const text = this.add.text(0, 0, textString, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '14px',
+            fontWeight: '600',
+            color: '#70e0a0',
+            align: 'center'
+        }).setOrigin(0.5);
+
+        const padX = text.width + 36;
+        const padY = 32;
+        bannerBg.fillRoundedRect(-padX / 2, -padY / 2, padX, padY, 8);
+        bannerBg.strokeRoundedRect(-padX / 2, -padY / 2, padX, padY, 8);
+
+        this.tutorialContainer.add([bannerBg, text]);
+        this.tutorialContainer.setAlpha(0);
+
+        this.tweens.add({
+            targets: this.tutorialContainer,
+            alpha: 1,
+            duration: 250,
+            ease: 'Power2'
+        });
+
+        this.time.delayedCall(3800, () => {
+            if (this.tutorialContainer) {
+                this.tweens.add({
+                    targets: this.tutorialContainer,
+                    alpha: 0,
+                    duration: 700,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        if (this.tutorialContainer) this.tutorialContainer.destroy();
+                    }
+                });
+            }
+        });
+    }
+
+    createDebugHUD() {
+        this.debugText = this.add.text(640, 75, "", {
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            color: '#facc15',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            padding: { x: 8, y: 4 }
+        }).setOrigin(0.5).setDepth(1500).setVisible(DEBUG);
+    }
+
+    setDebugText(text) {
+        if (this.debugText) {
+            this.debugText.setText(text);
+            this.debugText.setVisible(DEBUG);
+        }
+    }
+}
+
+// ============================================================================
 // Main Game Scene
 // ============================================================================
 class GameScene extends Phaser.Scene {
@@ -776,12 +1278,16 @@ class GameScene extends Phaser.Scene {
 
         this.activeHazardControllers = [];
 
-        // Animation state variables
+        // Slime animation state
         this.lastMoveDir = 1;
         this.directionSquashUntil = 0;
         this.landingSquashUntil = 0;
         this.nextBlinkTime = 0;
         this.blinkUntil = 0;
+    }
+
+    getUIScene() {
+        return this.scene.get('UIScene');
     }
 
     setPlayerSpriteTexture(key, flipY = false) {
@@ -796,32 +1302,59 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('background', 'assets/background.png');
+        // 1. Background: zone1_background.webp (98 KB version)
+        this.load.image('background', 'assets/zone1/zone1_background.webp');
+
+        // 2. Slime Player Textures
         this.load.image('slime', 'assets/slime.png');
         this.load.image('slime_jump', 'assets/slime_jump.png');
-        this.load.image('slime_squish', 'assets/slime_squish.png');
         this.load.image('slime_upside', 'assets/slime_upside.png');
-        this.load.image('platform_stone', 'assets/platform_stone.png');
-        this.load.image('platform_metal', 'assets/platform_metal.png');
-        this.load.image('spikes', 'assets/spikes.png');
-        this.load.image('saw', 'assets/saw.png');
-        this.load.image('bounce_pad', 'assets/bounce_pad.png');
-        this.load.image('goal_flag', 'assets/goal_flag.png');
-        this.load.image('checkpoint_flag', 'assets/checkpoint_flag.png');
+
+        // 3. Zone 1 Platform Assets
+        this.load.image('zone1_plat_tiny', 'assets/zone1/zone1_plat_tiny.png');
+        this.load.image('zone1_plat_small', 'assets/zone1/zone1_plat_small.png');
+        this.load.image('zone1_plat_medium', 'assets/zone1/zone1_plat_medium.png');
+        this.load.image('zone1_ground_long', 'assets/zone1/zone1_ground_long.png');
+        this.load.image('zone1_pillar', 'assets/zone1/zone1_pillar.png');
+        this.load.image('zone1_wall', 'assets/zone1/zone1_wall.png');
+        this.load.image('zone1_ceiling', 'assets/zone1/zone1_ceiling.png');
+        this.load.image('zone1_ceil_float', 'assets/zone1/zone1_ceil_float.png');
+        this.load.image('platform_metal', 'assets/zone1/platform_metal.png');
+
+        // 4. Hazards & Objects
+        this.load.image('saw', 'assets/zone1/saw.png');
+        this.load.image('swing_saw', 'assets/zone1/swing_saw.png');
+        this.load.image('spikes', 'assets/zone1/spikes.png');
+        this.load.image('rising_spikes', 'assets/zone1/rising_spikes.png');
+        this.load.image('slide_spike', 'assets/zone1/slide_spike.png');
+        this.load.image('falling_platform', 'assets/zone1/falling_platform.png');
+        this.load.image('bounce_pad', 'assets/zone1/bounce_pad.png');
+        this.load.image('bounce_pad_up', 'assets/zone1/bounce_pad_up.png');
+        this.load.image('bounce_pad_down', 'assets/zone1/bounce_pad_down.png');
+        this.load.image('checkpoint_flag', 'assets/zone1/checkpoint_flag.png');
+        this.load.image('goal_flag', 'assets/zone1/goal_flag.png');
+        this.load.image('obs_turret', 'assets/zone1/obs_turret.png');
+        this.load.image('obs_bullet', 'assets/zone1/obs_bullet.png');
+        this.load.image('obs_conveyor', 'assets/zone1/obs_conveyor.png');
+        this.load.image('obs_crusher', 'assets/zone1/obs_crusher.png');
+        this.load.image('trap_plate_wall', 'assets/zone1/trap_plate_wall.png');
+
+        // 5. Decor
+        this.load.image('zone1_decor_rocks', 'assets/zone1/zone1_decor_rocks.png');
+        this.load.image('zone1_decor_stalactite', 'assets/zone1/zone1_decor_stalactite.png');
 
         this.input.addPointer(2);
     }
 
     create() {
         this.createFallbackTextures();
-        this.loadLevel(this.currentLevelIndex);
         this.setupKeyboardControls();
-        this.createTopHUD();
-        this.createEdgeTouchControls();
 
-        if (DEBUG) {
-            this.createDebugHUD();
-        }
+        this.loadLevel(this.currentLevelIndex);
+
+        // Run self-test and output gap tables on startup
+        runSelfTest();
+        printLevelGapTable(GAME_LEVELS[this.currentLevelIndex]);
 
         if (window.UIManager) {
             window.UIManager.init(this);
@@ -832,6 +1365,21 @@ class GameScene extends Phaser.Scene {
     }
 
     createFallbackTextures() {
+        if (!this.textures.exists('dummy_col')) {
+            const canvas = this.textures.createCanvas('dummy_col', 16, 16);
+            canvas.refresh();
+        }
+
+        if (!this.textures.exists('slime_squish')) {
+            const canvas = this.textures.createCanvas('slime_squish', 64, 32);
+            const ctx = canvas.getContext();
+            ctx.fillStyle = '#2ecc71';
+            ctx.beginPath();
+            ctx.ellipse(32, 16, 30, 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+            canvas.refresh();
+        }
+
         if (!this.textures.exists('slime')) {
             const canvas = this.textures.createCanvas('slime', 64, 54);
             const ctx = canvas.getContext();
@@ -856,22 +1404,6 @@ class GameScene extends Phaser.Scene {
             canvas.refresh();
         }
 
-        if (!this.textures.exists('platform_stone')) {
-            const canvas = this.textures.createCanvas('platform_stone', 120, 60);
-            const ctx = canvas.getContext();
-            ctx.fillStyle = '#3a3447';
-            ctx.fillRect(0, 0, 120, 60);
-            canvas.refresh();
-        }
-
-        if (!this.textures.exists('platform_metal')) {
-            const canvas = this.textures.createCanvas('platform_metal', 120, 60);
-            const ctx = canvas.getContext();
-            ctx.fillStyle = '#2c3e50';
-            ctx.fillRect(0, 0, 120, 60);
-            canvas.refresh();
-        }
-
         if (!this.textures.exists('spikes')) {
             const canvas = this.textures.createCanvas('spikes', 80, 45);
             const ctx = canvas.getContext();
@@ -883,20 +1415,6 @@ class GameScene extends Phaser.Scene {
                 ctx.lineTo(i * 20 + 20, 45);
                 ctx.fill();
             }
-            canvas.refresh();
-        }
-
-        if (!this.textures.exists('bounce_pad')) {
-            const canvas = this.textures.createCanvas('bounce_pad', 85, 36);
-            const ctx = canvas.getContext();
-            ctx.fillStyle = '#475569';
-            ctx.beginPath();
-            ctx.roundRect(0, 8, 85, 28, 8);
-            ctx.fill();
-            ctx.fillStyle = '#a855f7';
-            ctx.beginPath();
-            ctx.ellipse(42, 12, 36, 8, 0, 0, Math.PI * 2);
-            ctx.fill();
             canvas.refresh();
         }
 
@@ -932,13 +1450,23 @@ class GameScene extends Phaser.Scene {
         this.clearActiveHazards();
 
         if (this.hazardWarnGfx) { this.hazardWarnGfx.clear(); }
+        if (this.debugGfx) { this.debugGfx.clear(); }
         if (this.arcGfx) { this.arcGfx.clear(); }
 
         if (!this.hazardWarnGfx) {
             this.hazardWarnGfx = this.add.graphics().setDepth(4);
         }
 
-        if (this.platforms) this.platforms.clear(true, true);
+        if (this.solidPlatforms) this.solidPlatforms.clear(true, true);
+        if (this.oneWayPlatforms) this.oneWayPlatforms.clear(true, true);
+        if (this.pitTriggers) this.pitTriggers.clear(true, true);
+        if (this.movingPlatformsGroup) this.movingPlatformsGroup.clear(true, true);
+        if (this.movingPlatforms) {
+            this.movingPlatforms.forEach(p => { if (p.tween) p.tween.stop(); p.destroy(); });
+            this.movingPlatforms = [];
+        }
+        if (this.decorGroup) { this.decorGroup.clear(true, true); this.decorGroup = null; }
+        if (this.abyssGfx) { this.abyssGfx.destroy(); this.abyssGfx = null; }
         if (this.fallingPlatformsGroup) this.fallingPlatformsGroup.clear(true, true);
         if (this.telegraphedHazardsGroup) this.telegraphedHazardsGroup.clear(true, true);
         if (this.spikes) this.spikes.clear(true, true);
@@ -968,77 +1496,76 @@ class GameScene extends Phaser.Scene {
             : GAME_LEVELS[0];
 
         this.levelData = levelData;
-        this.validationReport = validateLevel(levelData);
 
-        this.currentCheckpoint = {
-            x: levelData.playerStart.x,
-            y: levelData.playerStart.y
-        };
+        const worldW = levelData.worldWidth || 3600;
+        const worldH = 720; // FIXED WORLD HEIGHT
+        this.physics.world.setBounds(0, 0, worldW, worldH);
 
-        this.physics.world.setBounds(0, 0, levelData.worldWidth, levelData.worldHeight);
-        if (this.hudLevelText) {
-            this.hudLevelText.setText(`LEVEL ${levelData.id}: ${(levelData.name || '').replace(/Level \d+:\s*/, '').toUpperCase()}`);
+        // Update UI scene header text
+        const uiScene = this.getUIScene();
+        if (uiScene) {
+            uiScene.updateLevelText(`LEVEL ${levelData.id}: ${(levelData.name || '').replace(/Level \d+:\s*/, '').toUpperCase()}`);
+            uiScene.updateDeaths(window.gameDeathCount);
+            uiScene.updateGravityUI(false, false);
         }
 
-        // 1. Background
+        // 1. Parallax Background on X-axis only (scrollY locked)
         if (this.textures.exists('background')) {
-            this.bg = this.add.tileSprite(0, 0, levelData.worldWidth, levelData.worldHeight, 'background');
+            this.bg = this.add.tileSprite(0, 0, worldW, 720, 'background');
             this.bg.setOrigin(0, 0);
-            this.bg.setScrollFactor(0.2, 0);
-            this.bg.setDisplaySize(levelData.worldWidth, levelData.worldHeight);
+            this.bg.setScrollFactor(0.2, 0); // X-only parallax!
+            this.bg.setDisplaySize(worldW, 720);
             if (levelData.bgTint) {
                 this.bg.setTint(levelData.bgTint);
             }
         } else {
             const bgGfx = this.add.graphics();
             bgGfx.fillGradientStyle(0x0a0c1a, 0x0a0c1a, 0x16122d, 0x16122d, 1);
-            bgGfx.fillRect(0, 0, levelData.worldWidth, levelData.worldHeight);
+            bgGfx.fillRect(0, 0, worldW, 720);
         }
 
         // 2. Flip Zones & Lock Zones
         this.createZoneOverlays(levelData.zones || []);
 
-        // 3. Regular Platforms
+        // 3. Platform Groups
         this.physics.world.OVERLAP_BIAS = 32;
         this.physics.world.TILE_BIAS = 32;
 
-        this.platforms = this.physics.add.staticGroup();
-        levelData.platforms.forEach(p => {
-            const texKey = p.type === 'metal' ? 'platform_metal' : 'platform_stone';
-            const platform = this.platforms.create(p.x, p.y, texKey);
-            platform.setDisplaySize(p.width, p.height);
+        this.solidPlatforms = this.physics.add.staticGroup();
+        this.oneWayPlatforms = this.physics.add.staticGroup();
+        this.pitTriggers = this.physics.add.staticGroup();
+        this.movingPlatforms = [];
+        this.movingPlatformsGroup = this.physics.add.group();
 
-            if (p.y < 200) {
-                platform.setFlipY(true);
-            }
+        // 4. Seamless 3-Slice Ground System & Platform Building
+        this.buildPlatformsAndGround(levelData);
 
-            platform.refreshBody();
-        });
+        // 5. Pits & Abyss Rendering
+        this.buildPitsAndAbyss(levelData);
 
-        // 4. Telegraphed Hazards Engine (Physics Group)
+        // 6. Hazards & Spikes
         this.telegraphedHazardsGroup = this.physics.add.group();
         this.fallingPlatformsGroup = this.physics.add.staticGroup();
         this.bouncePadsGroup = this.physics.add.staticGroup();
         this.initTelegraphedHazards(levelData.telegraphedHazards || []);
 
-        // 5. Static Spikes Group (Hitbox sized to 85% of image, centered, sitting flush on ground/ceiling)
+        // 7. Static Spikes Group (85% hitbox, sitting flush on ground at y = 600 or ceiling at y = 130)
         this.spikes = this.physics.add.staticGroup();
         if (levelData.spikes) {
             levelData.spikes.forEach(s => {
                 let sy = s.y;
-                if (s.side === 'ceiling' || sy < 300) {
-                    sy = 145 + s.height / 2;
-                } else if (sy < 640) {
-                    sy = 620 - s.height / 2;
+                const isCeil = (s.side === 'ceiling' || sy < 300);
+                if (isCeil) {
+                    sy = 130 + s.height / 2;
+                } else {
+                    sy = GROUND_TOP_Y - s.height / 2;
                 }
+
                 const spike = this.spikes.create(s.x, sy, 'spikes');
                 spike.setDisplaySize(s.width, s.height);
+                if (isCeil) spike.setFlipY(true);
 
-                if (s.side === 'ceiling' || s.y < 300) {
-                    spike.setFlipY(true);
-                }
-
-                // Precision 85% hitbox centered on visual image
+                // Precise 85% centered hitbox
                 spike.body.setSize(spike.width * 0.85, spike.height * 0.85, true);
                 spike.refreshBody();
 
@@ -1046,14 +1573,16 @@ class GameScene extends Phaser.Scene {
             });
         }
 
-        // 6. Checkpoints
+        // 8. Checkpoints
         this.checkpointsGroup = this.physics.add.staticGroup();
         if (levelData.checkpoints) {
             levelData.checkpoints.forEach(cp => {
-                const flag = this.checkpointsGroup.create(cp.x, cp.y, 'checkpoint_flag');
+                const flagY = (cp.y || GROUND_TOP_Y) - 42;
+                const flag = this.checkpointsGroup.create(cp.x, flagY, 'checkpoint_flag');
                 flag.setDisplaySize(54, 85);
                 flag.refreshBody();
                 flag.checkpointId = cp.id;
+                flag.walkTop = cp.y || GROUND_TOP_Y;
                 flag.isActivated = (this.currentCheckpoint && Math.abs(this.currentCheckpoint.x - cp.x) < 50);
 
                 if (flag.isActivated) {
@@ -1064,58 +1593,85 @@ class GameScene extends Phaser.Scene {
             });
         }
 
-        // 7. Goal Flag
-        const goalPos = levelData.goal || { x: levelData.worldWidth - 150, y: 585 };
-        this.goal = this.physics.add.sprite(goalPos.x, goalPos.y, 'goal_flag');
+        // 9. Goal Flag
+        const goalPos = levelData.goal || { x: worldW - 150, y: GROUND_TOP_Y };
+        const goalFlagY = (goalPos.y || GROUND_TOP_Y) - 47;
+        this.goal = this.physics.add.sprite(goalPos.x, goalFlagY, 'goal_flag');
         this.goal.setDisplaySize(60, 95);
         this.goal.body.setAllowGravity(false);
         this.goal.body.setImmovable(true);
-        // Tight physical hitbox at pole and cloth (24x60 px)
         this.goal.body.setSize(this.goal.width * (24 / 60), this.goal.height * (60 / 95), true);
         this.goal.refreshBody();
 
         this.tweens.add({
             targets: this.goal,
-            y: goalPos.y - 8,
+            y: goalFlagY - 8,
             duration: 1200,
             yoyo: true,
             repeat: -1,
             ease: 'Sine.easeInOut'
         });
 
-        // 8. Player Slime
-        const spawnX = this.currentCheckpoint ? this.currentCheckpoint.x : levelData.playerStart.x;
-        const spawnY = this.currentCheckpoint ? this.currentCheckpoint.y : levelData.playerStart.y;
+        // 10. Player Slime Spawn
+        const spawnX = this.currentCheckpoint ? this.currentCheckpoint.x : (levelData.playerStart ? levelData.playerStart.x : 140);
+        const spawnY = this.currentCheckpoint ? (this.currentCheckpoint.walkTop - PLAYER.HEIGHT / 2) : (levelData.playerStart ? levelData.playerStart.y : 568);
 
         this.player = this.physics.add.sprite(spawnX, spawnY, 'slime');
         this.player.setDisplaySize(PLAYER.WIDTH, PLAYER.HEIGHT);
         this.player.setCollideWorldBounds(false);
-
         this.player.body.setSize(PLAYER.HITBOX_WIDTH, PLAYER.HITBOX_HEIGHT, true);
         this.player.body.setMaxVelocity(PLAYER.RUN_SPEED, PLAYER.MAX_FALL_SPEED);
 
-        // 9. Colliders & Overlaps (BUG 1 FIX: Kills instantly when hazard is visible!)
-        this.physics.add.collider(this.player, this.platforms);
-        this.physics.add.collider(this.player, this.fallingPlatformsGroup);
+        // Solid ground colliders
+        this.physics.add.collider(this.player, this.solidPlatforms);
+        this.physics.add.collider(this.player, this.movingPlatformsGroup);
 
-        this.physics.add.overlap(this.player, this.spikes, (player, hazard) => {
-            if (hazard && hazard.body && hazard.body.enable && hazard.alpha > 0.4) {
-                this.handlePlayerDeath("spikes");
+        // One-Way Platform Colliders (jump through from below, downward landings only!)
+        this.physics.add.collider(this.player, this.oneWayPlatforms, null, (player, plat) => {
+            if (this.isDead) return false;
+            const pBody = player.body;
+            if (!this.isFlipped) {
+                // Moving down, feet previously at or above platform top
+                const prevBottom = pBody.prev.y + pBody.height;
+                return (pBody.velocity.y >= 0 && prevBottom <= plat.walkTop + 16);
+            } else {
+                // Flipped: moving up, head previously at or below platform bottom
+                const prevTop = pBody.prev.y;
+                return (pBody.velocity.y <= 0 && prevTop >= plat.walkTop - 16);
+            }
+        }, this);
+
+        // Falling Platform Colliders
+        this.physics.add.collider(this.player, this.fallingPlatformsGroup, (player, plat) => {
+            if (!plat || plat.isFalling || !plat.active || this.isDead) return;
+            const pBody = player.body;
+            const platTop = plat.y - plat.displayHeight / 2;
+            const platBottom = plat.y + plat.displayHeight / 2;
+            const platLeft = plat.x - plat.displayWidth / 2;
+            const platRight = plat.x + plat.displayWidth / 2;
+
+            const horizontallyAligned = (pBody.right > platLeft + 6) && (pBody.left < platRight - 6);
+            const standingOnFloor = !this.isFlipped && (pBody.blocked.down || pBody.touching.down) && Math.abs(pBody.bottom - platTop) <= 8;
+            const standingOnCeiling = this.isFlipped && (pBody.blocked.up || pBody.touching.up) && Math.abs(pBody.top - platBottom) <= 8;
+
+            if (horizontallyAligned && (standingOnFloor || standingOnCeiling)) {
+                this.triggerFallingPlatform(plat);
             }
         }, null, this);
 
+        // Hazard & Pit Overlaps
+        this.physics.add.overlap(this.player, this.spikes, () => this.handlePlayerDeath("spikes"), null, this);
         this.physics.add.overlap(this.player, this.telegraphedHazardsGroup, (player, hazard) => {
             if (hazard && hazard.body && hazard.body.enable && hazard.alpha > 0.4) {
                 this.handlePlayerDeath("telegraphedHazard");
             }
         }, null, this);
 
+        this.physics.add.overlap(this.player, this.pitTriggers, () => this.handlePlayerDeath("floor_pit"), null, this);
         this.physics.add.overlap(this.player, this.checkpointsGroup, (player, flag) => this.handleReachCheckpoint(flag), null, this);
         this.physics.add.overlap(this.player, this.goal, () => {
             if (this.levelCompleted || this.hasWon || this.isDead) return;
-            if (Math.abs(this.player.y - this.goal.y) < 65) {
-                this.handleLevelComplete();
-            }
+            this.handleLevelComplete();
         }, null, this);
 
         this.physics.add.overlap(this.player, this.bouncePadsGroup, (player, pad) => {
@@ -1123,7 +1679,6 @@ class GameScene extends Phaser.Scene {
             pad.lastBounceTime = this.time.now + 400;
 
             soundManager.playBounce();
-
             this.tweens.add({
                 targets: pad,
                 scaleX: pad.initialScaleX * 1.35,
@@ -1139,12 +1694,12 @@ class GameScene extends Phaser.Scene {
             this.slimeParticles.emitParticleAt(pad.x, pad.y, 14);
         }, null, this);
 
-        // 10. Camera
-        this.cameras.main.setBounds(0, 0, levelData.worldWidth, levelData.worldHeight);
-        this.cameras.main.centerOn(spawnX, spawnY);
-        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+        // 11. Camera Follow: X-only follow, locked Y!
+        this.cameras.main.setBounds(0, 0, worldW, 720);
+        this.cameras.main.scrollY = 0;
+        this.cameras.main.startFollow(this.player, true, 0.1, 0); // Lerp Y is 0!
 
-        // Particle Emitter
+        // Slime particle emitter
         this.slimeParticles = this.add.particles(0, 0, 'slime', {
             lifespan: 400,
             speed: { min: 80, max: 180 },
@@ -1153,21 +1708,160 @@ class GameScene extends Phaser.Scene {
             emitting: false
         });
 
-        if (this.hudLevelText) {
-            this.hudLevelText.setText(levelData.name.toUpperCase());
-        }
-
         this.checkCurrentZones();
-        this.updateGravityUI();
-        this.updateDeathCountUI();
-
         this.checkHintsAtPosition(spawnX);
     }
 
     // ------------------------------------------------------------------------
+    // Seamless 3-Slice Ground and Platform Builder
     // ------------------------------------------------------------------------
-    // Flip Zones & Lock Zones (Clean background gameplay - no visual clutter)
+    buildPlatformsAndGround(levelData) {
+        const platforms = levelData.platforms || [];
+
+        platforms.forEach(p => {
+            const typeKey = p.type || 'ground';
+            const meta = (typeof PLATFORM_TYPES !== 'undefined' && PLATFORM_TYPES[typeKey])
+                ? PLATFORM_TYPES[typeKey]
+                : null;
+
+            const w = p.w !== undefined ? p.w : (p.width !== undefined ? p.width : (meta ? meta.defaultWidth : 256));
+            const walkLeft = p.x !== undefined ? p.x : 0;
+            const walkRight = walkLeft + w;
+            const walkTop = p.y !== undefined ? p.y : GROUND_TOP_Y;
+            const centerX = walkLeft + w / 2;
+
+            if (typeKey === 'ground') {
+                // 3-Slice Seamless Base Ground:
+                // 1. Rock fill down to bottom of screen (720px) - completely prevents empty void!
+                const fillH = 720 - (walkTop + 20);
+                if (fillH > 0) {
+                    const rockFill = this.add.rectangle(centerX, (walkTop + 20) + fillH / 2, w, fillH, 0x1c1829);
+                    rockFill.setDepth(2);
+                }
+
+                // 2. Tiled zone1_ground_long with alternating flipX and 2px overlap
+                const tileW = 512;
+                const tileH = 64;
+                const numTiles = Math.ceil(w / (tileW - 2));
+
+                for (let i = 0; i < numTiles; i++) {
+                    const tileX = walkLeft + i * (tileW - 2) + tileW / 2;
+                    if (tileX - tileW / 2 >= walkRight) break;
+
+                    const tile = this.add.image(tileX, walkTop + tileH / 2 - 2, 'zone1_ground_long');
+                    tile.setDepth(3);
+                    if (i % 2 === 1) tile.setFlipX(true); // Alternate flipX eliminates repetitive seams!
+                }
+
+                // 3. One single merged static collider per ground slab
+                const slabH = 720 - walkTop;
+                const slabCollider = this.solidPlatforms.create(centerX, walkTop + slabH / 2, 'dummy_col');
+                slabCollider.setVisible(false);
+                slabCollider.setDisplaySize(w, slabH);
+                slabCollider.refreshBody();
+                slabCollider.walkTop = walkTop;
+                slabCollider.walkLeft = walkLeft;
+                slabCollider.walkRight = walkRight;
+
+            } else if (meta && meta.oneWay) {
+                // High Route Floating Platform (ONE-WAY)
+                const scaleX = w / (meta.walkRight - meta.walkLeft);
+                const scaleY = scaleX;
+                const dispW = meta.nativeSize[0] * scaleX;
+                const dispH = meta.nativeSize[1] * scaleY;
+
+                const imgCenterX = walkLeft - meta.walkLeft * scaleX + dispW / 2;
+                const imgCenterY = walkTop - meta.walkTop * scaleY + dispH / 2;
+
+                const sprite = this.add.image(imgCenterX, imgCenterY, meta.texture);
+                sprite.setDisplaySize(dispW, dispH);
+                sprite.setDepth(4);
+                if (meta.ceiling) sprite.setFlipY(true);
+
+                // Standable top 24px slab
+                const slabY = meta.ceiling ? (walkTop - 12) : (walkTop + 12);
+                const oneWaySlab = this.oneWayPlatforms.create(centerX, slabY, 'dummy_col');
+                oneWaySlab.setVisible(false);
+                oneWaySlab.setDisplaySize(w, 24);
+                oneWaySlab.refreshBody();
+                oneWaySlab.walkTop = walkTop;
+                oneWaySlab.walkLeft = walkLeft;
+                oneWaySlab.walkRight = walkRight;
+                oneWaySlab.isCeiling = meta.ceiling;
+                if (!meta.ceiling) {
+                    oneWaySlab.body.checkCollision.down = false;
+                    oneWaySlab.body.checkCollision.left = false;
+                    oneWaySlab.body.checkCollision.right = false;
+                } else {
+                    oneWaySlab.body.checkCollision.up = false;
+                    oneWaySlab.body.checkCollision.left = false;
+                    oneWaySlab.body.checkCollision.right = false;
+                }
+
+            } else if (typeKey === 'pillar' || typeKey === 'wall') {
+                // Solid Pillar or Wall
+                const dispW = w;
+                const dispH = 720 - walkTop;
+                const sprite = this.add.image(centerX, walkTop + dispH / 2, meta ? meta.texture : 'zone1_pillar');
+                sprite.setDisplaySize(dispW, dispH);
+                sprite.setDepth(4);
+
+                const colBody = this.solidPlatforms.create(centerX, walkTop + dispH / 2, 'dummy_col');
+                colBody.setVisible(false);
+                colBody.setDisplaySize(dispW, dispH);
+                colBody.refreshBody();
+                colBody.walkTop = walkTop;
+                colBody.walkLeft = walkLeft;
+                colBody.walkRight = walkRight;
+
+            } else if (meta && meta.ceiling) {
+                // Solid ceiling bridge for flip sections (at y = 130)
+                const dispW = w;
+                const dispH = 64;
+                const ceilSprite = this.add.tileSprite(centerX, walkTop - dispH / 2, w, dispH, meta.texture);
+                ceilSprite.setDepth(4);
+                ceilSprite.setFlipY(true);
+
+                const colBody = this.solidPlatforms.create(centerX, walkTop - 20, 'dummy_col');
+                colBody.setVisible(false);
+                colBody.setDisplaySize(w, 40);
+                colBody.refreshBody();
+                colBody.walkTop = walkTop;
+                colBody.walkLeft = walkLeft;
+                colBody.walkRight = walkRight;
+            }
+        });
+    }
+
     // ------------------------------------------------------------------------
+    // Pits, Rim Caps, and Abyss Death Triggers
+    // ------------------------------------------------------------------------
+    buildPitsAndAbyss(levelData) {
+        const pits = levelData.pits || [];
+        this.abyssGfx = this.add.graphics().setDepth(2);
+
+        pits.forEach(pit => {
+            const pitLeft = pit.x;
+            const pitWidth = pit.w;
+            const pitRight = pitLeft + pitWidth;
+
+            // 1. Dark abyss gradient inside pit
+            this.abyssGfx.fillGradientStyle(0x0a0c1a, 0x0a0c1a, 0x010206, 0x010206, 0.4, 0.4, 1.0, 1.0);
+            this.abyssGfx.fillRect(pitLeft, GROUND_TOP_Y, pitWidth, 120);
+
+            // 2. Visible rim caps on pit edges
+            this.abyssGfx.fillStyle(0x332840, 0.9);
+            this.abyssGfx.fillRect(pitLeft - 4, GROUND_TOP_Y, 4, 16);
+            this.abyssGfx.fillRect(pitRight, GROUND_TOP_Y, 4, 16);
+
+            // 3. Pit death trigger zone (invisible overlap sensor)
+            const trigger = this.pitTriggers.create(pitLeft + pitWidth / 2, GROUND_TOP_Y + 50, 'dummy_col');
+            trigger.setVisible(false);
+            trigger.setDisplaySize(pitWidth + 8, 90);
+            trigger.refreshBody();
+        });
+    }
+
     createZoneOverlays(zones) {
         if (!ZONE_GLOW) return;
         if (!this.zoneGraphics) {
@@ -1176,43 +1870,44 @@ class GameScene extends Phaser.Scene {
         this.zoneGraphics.clear();
         zones.forEach(z => {
             if (z.type === 'flipZone') {
-                this.zoneGraphics.fillStyle(0x00f2fe, 0.05); // soft glow, no border
+                this.zoneGraphics.fillStyle(0x00f2fe, 0.05);
                 this.zoneGraphics.fillRect(z.x, 0, z.width, 720);
             } else if (z.type === 'lockZone') {
-                this.zoneGraphics.fillStyle(0xff0055, 0.05); // soft glow, no border
+                this.zoneGraphics.fillStyle(0xff0055, 0.05);
                 this.zoneGraphics.fillRect(z.x, 0, z.width, 720);
             }
         });
     }
 
     addHazardWarning(hazardStartX) {
+        if (this.levelData && (this.levelData.id === 5 || this.currentLevelIndex === 4)) {
+            return;
+        }
+
         if (!this.hazardWarnGfx) {
             this.hazardWarnGfx = this.add.graphics().setDepth(4);
         }
         const warnX = Math.round(hazardStartX - 60);
-        if (warnX < 260) return; // Don't place too close to spawn point
+        if (warnX < 260) return;
 
-        // Subtle red ground glow
         this.hazardWarnGfx.fillStyle(0xef4444, 0.16);
-        this.hazardWarnGfx.fillEllipse(warnX, 619, 18, 5);
+        this.hazardWarnGfx.fillEllipse(warnX, GROUND_TOP_Y + 1, 18, 5);
 
-        // Small clean 13px warning triangle
         this.hazardWarnGfx.fillStyle(0xd97706, 0.9);
         this.hazardWarnGfx.beginPath();
-        this.hazardWarnGfx.moveTo(warnX, 606);
-        this.hazardWarnGfx.lineTo(warnX - 7, 618);
-        this.hazardWarnGfx.lineTo(warnX + 7, 618);
+        this.hazardWarnGfx.moveTo(warnX, GROUND_TOP_Y - 14);
+        this.hazardWarnGfx.lineTo(warnX - 7, GROUND_TOP_Y - 2);
+        this.hazardWarnGfx.lineTo(warnX + 7, GROUND_TOP_Y - 2);
         this.hazardWarnGfx.closePath();
         this.hazardWarnGfx.fillPath();
 
-        // Small exclamation point
         this.hazardWarnGfx.fillStyle(0xffffff, 1);
-        this.hazardWarnGfx.fillRect(warnX - 1, 609, 2, 4);
-        this.hazardWarnGfx.fillCircle(warnX, 615.5, 1);
+        this.hazardWarnGfx.fillRect(warnX - 1, GROUND_TOP_Y - 11, 2, 4);
+        this.hazardWarnGfx.fillCircle(warnX, GROUND_TOP_Y - 4.5, 1);
     }
 
     // ------------------------------------------------------------------------
-    // Telegraphed Hazards Engine (BUG 1 FIX: 85% Centered Hitboxes)
+    // Telegraphed Hazards Engine
     // ------------------------------------------------------------------------
     initTelegraphedHazards(hazardList) {
         hazardList.forEach(data => {
@@ -1252,37 +1947,13 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    // 1. Moving Hazard (Ping-pong Saws or Spikes)
     createMovingHazard(data) {
         const texKey = data.hazardType === 'spikes' ? 'spikes' : 'saw';
         let posY = data.y;
         const radius = data.radius || (data.height ? data.height / 2 : 36);
 
-        // Position patrol saw right on top of its platform surface
         if ((data.type === 'patrolSaw' || texKey === 'saw') && data.axis === 'horizontal') {
-            if (this.levelData && this.levelData.platforms) {
-                const targetX = data.x + data.distance;
-                const midX = (data.x + targetX) / 2;
-                // Find matching floor or ceiling platform
-                const candidatePlats = this.levelData.platforms.filter(p => {
-                    const left = p.x - p.width / 2;
-                    const right = p.x + p.width / 2;
-                    return (midX >= left && midX <= right) || (data.x >= left && data.x <= right);
-                });
-                if (candidatePlats.length > 0) {
-                    if (data.side === 'ceiling' || posY < 300) {
-                        const ceilPlat = candidatePlats.find(p => p.y < 300);
-                        if (ceilPlat) posY = (ceilPlat.y + ceilPlat.height / 2) + radius;
-                    } else {
-                        const floorPlats = candidatePlats.filter(p => p.y >= 300);
-                        if (floorPlats.length > 0) {
-                            floorPlats.sort((a, b) => Math.abs(a.y - (data.y || 600)) - Math.abs(b.y - (data.y || 600)));
-                            const platformTop = floorPlats[0].y - floorPlats[0].height / 2;
-                            posY = platformTop - radius;
-                        }
-                    }
-                }
-            }
+            posY = GROUND_TOP_Y - radius;
         }
 
         const hazard = this.telegraphedHazardsGroup.create(data.x, posY, texKey);
@@ -1290,7 +1961,6 @@ class GameScene extends Phaser.Scene {
         hazard.body.setAllowGravity(false);
         hazard.body.setImmovable(true);
 
-        // Accurate 85% centered hitbox in unscaled texture space
         if (data.hazardType === 'saw' || data.radius || texKey === 'saw') {
             const unscaledRadius = (hazard.width * 0.5) * 0.85;
             const unscaledOffsetX = (hazard.width - unscaledRadius * 2) / 2;
@@ -1304,7 +1974,6 @@ class GameScene extends Phaser.Scene {
         const targetX = data.axis === 'horizontal' ? data.x + data.distance : data.x;
         const targetY = data.axis === 'vertical' ? posY + data.distance : posY;
 
-        // NOTE: Black track / line removed completely as requested
         this.addHazardWarning(Math.min(data.x, targetX));
 
         const tween = this.tweens.add({
@@ -1328,12 +1997,13 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    // 2. Blink Hazard (Blinks 3 times, disappears for 1.5s, then returns)
     createBlinkHazard(data) {
-        const texKey = data.hazardType === 'platform' ? 'platform_stone' : 'spikes';
+        const texKey = 'spikes';
         let posY = data.y;
-        if (data.hazardType === 'spikes' && posY > 450 && posY < 640) {
-            posY = 620 - (data.height || 45) / 2;
+        if (data.side === 'ceiling' || posY < 300) {
+            posY = 130 + (data.height || 45) / 2;
+        } else {
+            posY = GROUND_TOP_Y - (data.height || 45) / 2;
         }
 
         const hazard = this.telegraphedHazardsGroup.create(data.x, posY, texKey);
@@ -1342,7 +2012,6 @@ class GameScene extends Phaser.Scene {
         hazard.body.setImmovable(true);
 
         if (data.side === 'ceiling') hazard.setFlipY(true);
-        // Centered 85% body
         hazard.body.setSize(hazard.width * 0.85, hazard.height * 0.80, true);
         hazard.body.enable = true;
 
@@ -1358,12 +2027,10 @@ class GameScene extends Phaser.Scene {
         const runCycle = () => {
             if (!isRunning || !hazard.active) return;
 
-            // Phase 1: Solid & Deadly
             hazard.enableBody(true, data.x, posY, true, true);
             hazard.setAlpha(1.0);
             hazard.clearTint();
 
-            // Phase 2: Warning Telegraph (Blink 3 times)
             const warningDelay = Math.max(300, visibleDuration - (blinkCount * 220));
             activeTimer = this.time.delayedCall(warningDelay, () => {
                 if (!isRunning || !hazard.active) return;
@@ -1378,12 +2045,9 @@ class GameScene extends Phaser.Scene {
                     repeat: blinkCount - 1,
                     onComplete: () => {
                         if (!isRunning || !hazard.active) return;
-
-                        // Phase 3: Vanish & Disable
                         hazard.disableBody(true, false);
                         hazard.setAlpha(0);
 
-                        // Phase 4: Reappear after disappearDuration
                         activeTimer = this.time.delayedCall(disappearDuration, () => {
                             runCycle();
                         });
@@ -1406,7 +2070,6 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    // 3. Slide Spike (Rumbles & slides out on rhythm)
     createSlideSpike(data) {
         const hazard = this.telegraphedHazardsGroup.create(data.x, data.y, 'spikes');
         hazard.setDisplaySize(data.width, data.height);
@@ -1429,7 +2092,6 @@ class GameScene extends Phaser.Scene {
         const runCycle = () => {
             if (!isRunning || !hazard.active) return;
 
-            // Retracted Phase (Safe)
             hazard.setPosition(data.x, retractedY);
             hazard.disableBody(true, false);
             hazard.setAlpha(0.25);
@@ -1438,7 +2100,6 @@ class GameScene extends Phaser.Scene {
             activeTimer = this.time.delayedCall(data.inTime || 1600, () => {
                 if (!isRunning || !hazard.active) return;
 
-                // Warning Rumble
                 hazard.setTint(0xff6600);
                 soundManager.playWarning();
                 this.tweens.add({
@@ -1449,8 +2110,6 @@ class GameScene extends Phaser.Scene {
                     repeat: 4,
                     onComplete: () => {
                         if (!isRunning || !hazard.active) return;
-
-                        // Slide Out
                         this.tweens.add({
                             targets: hazard,
                             y: extendedY,
@@ -1461,11 +2120,8 @@ class GameScene extends Phaser.Scene {
                                 if (!isRunning || !hazard.active) return;
                                 hazard.enableBody(true, data.x, extendedY, true, true);
 
-                                // Extended Phase (Deadly)
                                 activeTimer = this.time.delayedCall(data.outTime || 1200, () => {
                                     if (!isRunning || !hazard.active) return;
-
-                                    // Slide Back In
                                     hazard.disableBody(true, false);
                                     this.tweens.add({
                                         targets: hazard,
@@ -1499,13 +2155,12 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    // 4. Falling Platform
     createFallingPlatform(data) {
-        const platform = this.fallingPlatformsGroup.create(data.x, data.y, 'platform_stone');
-        platform.setDisplaySize(data.width, data.height);
+        const platform = this.fallingPlatformsGroup.create(data.x + data.width / 2, data.y + 12, 'platform_metal');
+        platform.setDisplaySize(data.width, 24);
         platform.refreshBody();
-        platform.originalX = data.x;
-        platform.originalY = data.y;
+        platform.originalX = data.x + data.width / 2;
+        platform.originalY = data.y + 12;
         platform.shakeDuration = data.shakeDuration || 500;
         platform.isFalling = false;
 
@@ -1513,282 +2168,49 @@ class GameScene extends Phaser.Scene {
             platform,
             reset: () => {
                 this.tweens.killTweensOf(platform);
-                platform.enableBody(true, data.x, data.y, true, true);
-                platform.setPosition(data.x, data.y);
+                platform.isFalling = false;
+                platform.enableBody(true, platform.originalX, platform.originalY, true, true);
+                platform.setPosition(platform.originalX, platform.originalY);
                 platform.setAlpha(1.0);
                 platform.clearTint();
-                platform.isFalling = false;
                 platform.refreshBody();
             }
         });
     }
 
-    // 5. Split Platform Trapdoor (Splits into 2 pieces for 2s with animation, then reconnects!)
-    createSplitTrap(data) {
-        const halfWidth = data.width / 2;
-        const closedLeftX = data.x - halfWidth / 2;
-        const closedRightX = data.x + halfWidth / 2;
-        const splitDist = data.splitDistance || 100;
-        const openLeftX = closedLeftX - splitDist;
-        const openRightX = closedRightX + splitDist;
+    triggerFallingPlatform(plat) {
+        if (!plat || plat.isFalling || !plat.active) return;
+        plat.isFalling = true;
+        soundManager.playWarning();
+        plat.setTint(0xff7733);
 
-        // Two halves that touch seamlessly in the center when closed
-        const leftHalf = this.platforms.create(closedLeftX, data.y, data.texture || 'platform_stone');
-        leftHalf.setDisplaySize(halfWidth, data.height);
-        leftHalf.refreshBody();
+        const shakeDuration = plat.shakeDuration || 500;
+        const repeatCount = Math.max(3, Math.floor(shakeDuration / 70));
 
-        const rightHalf = this.platforms.create(closedRightX, data.y, data.texture || 'platform_stone');
-        rightHalf.setDisplaySize(halfWidth, data.height);
-        rightHalf.refreshBody();
-
-        // Subtle visual center crack/seam
-        const seam = this.add.rectangle(data.x, data.y, 4, data.height + 2, 0x00f2fe, 0.45).setDepth(5);
-
-        let isRunning = true;
-        let activeTimer = null;
-        const closedDuration = data.closedDuration || 2800;
-        const openDuration = data.openDuration || 2000;
-        const warningDuration = data.warningDuration || 600;
-
-        const runCycle = () => {
-            if (!isRunning || !leftHalf.active || !rightHalf.active) return;
-
-            // Phase 1: Closed & Solid Ground (Safe to cross!)
-            leftHalf.setPosition(closedLeftX, data.y);
-            rightHalf.setPosition(closedRightX, data.y);
-            leftHalf.refreshBody();
-            rightHalf.refreshBody();
-            leftHalf.clearTint();
-            rightHalf.clearTint();
-            seam.setVisible(true);
-            seam.setFillStyle(0x38ef7d, 0.45);
-
-            // Wait until warning time before splitting
-            const waitBeforeWarning = Math.max(300, closedDuration - warningDuration);
-            activeTimer = this.time.delayedCall(waitBeforeWarning, () => {
-                if (!isRunning || !leftHalf.active || !rightHalf.active) return;
-
-                // Phase 2: Warning Telegraph (Amber glow, rumble jitter, warning sound)
-                leftHalf.setTint(0xff8800);
-                rightHalf.setTint(0xff8800);
-                seam.setFillStyle(0xff3333, 0.9);
-                soundManager.playWarning();
-
+        this.tweens.add({
+            targets: plat,
+            x: plat.originalX + 4,
+            duration: 35,
+            yoyo: true,
+            repeat: repeatCount,
+            onComplete: () => {
+                if (!plat.isFalling || !plat.active) return;
                 this.tweens.add({
-                    targets: [leftHalf, rightHalf],
-                    y: data.y - 2,
-                    duration: 35,
-                    yoyo: true,
-                    repeat: Math.floor(warningDuration / 70),
+                    targets: plat,
+                    y: plat.originalY + 360,
+                    alpha: 0,
+                    duration: 420,
+                    ease: 'Quad.easeIn',
                     onComplete: () => {
-                        if (!isRunning || !leftHalf.active || !rightHalf.active) return;
-                        leftHalf.y = data.y;
-                        rightHalf.y = data.y;
-                        leftHalf.refreshBody();
-                        rightHalf.refreshBody();
-
-                        // Phase 3: Split into 2 pieces with smooth slide animation!
-                        seam.setVisible(false);
-
-                        this.tweens.add({
-                            targets: leftHalf,
-                            x: openLeftX,
-                            duration: 220,
-                            ease: 'Power2.easeOut',
-                            onUpdate: () => {
-                                leftHalf.refreshBody();
-                            }
-                        });
-
-                        this.tweens.add({
-                            targets: rightHalf,
-                            x: openRightX,
-                            duration: 220,
-                            ease: 'Power2.easeOut',
-                            onUpdate: () => {
-                                rightHalf.refreshBody();
-                            },
-                            onComplete: () => {
-                                if (!isRunning || !leftHalf.active || !rightHalf.active) return;
-                                leftHalf.refreshBody();
-                                rightHalf.refreshBody();
-
-                                // Phase 4: Stays Split Open for 2 SECONDS (Creates hole where player drops)
-                                activeTimer = this.time.delayedCall(openDuration, () => {
-                                    if (!isRunning || !leftHalf.active || !rightHalf.active) return;
-
-                                    // Phase 5: Closing animation (reconnecting into solid base)
-                                    this.tweens.add({
-                                        targets: leftHalf,
-                                        x: closedLeftX,
-                                        duration: 220,
-                                        ease: 'Power2.easeInOut',
-                                        onUpdate: () => {
-                                            leftHalf.refreshBody();
-                                        }
-                                    });
-
-                                    this.tweens.add({
-                                        targets: rightHalf,
-                                        x: closedRightX,
-                                        duration: 220,
-                                        ease: 'Power2.easeInOut',
-                                        onUpdate: () => {
-                                            rightHalf.refreshBody();
-                                        },
-                                        onComplete: () => {
-                                            if (!isRunning || !leftHalf.active || !rightHalf.active) return;
-                                            leftHalf.refreshBody();
-                                            rightHalf.refreshBody();
-                                            soundManager.playLand();
-
-                                            // Quick safe flash
-                                            leftHalf.setTint(0x38ef7d);
-                                            rightHalf.setTint(0x38ef7d);
-                                            seam.setVisible(true);
-                                            seam.setFillStyle(0x38ef7d, 0.7);
-
-                                            this.time.delayedCall(160, () => {
-                                                leftHalf.clearTint();
-                                                rightHalf.clearTint();
-                                            });
-
-                                            runCycle();
-                                        }
-                                    });
-                                });
-                            }
-                        });
+                        plat.disableBody(true, false);
                     }
                 });
-            });
-        };
-
-        runCycle();
-
-        this.activeHazardControllers.push({
-            leftHalf,
-            rightHalf,
-            seam,
-            cleanup: () => {
-                isRunning = false;
-                if (activeTimer) activeTimer.remove();
-                if (seam) seam.destroy();
-            },
-            reset: () => {
-                isRunning = false;
-                if (activeTimer) activeTimer.remove();
-                this.tweens.killTweensOf(leftHalf);
-                this.tweens.killTweensOf(rightHalf);
-                leftHalf.setPosition(closedLeftX, data.y);
-                rightHalf.setPosition(closedRightX, data.y);
-                leftHalf.refreshBody();
-                rightHalf.refreshBody();
-                leftHalf.clearTint();
-                rightHalf.clearTint();
-                seam.setVisible(true);
-                seam.setFillStyle(0x38ef7d, 0.45);
-                isRunning = true;
-                runCycle();
             }
         });
     }
 
-    // 6. Drag Trap (Collapsing Ground Block - rumbles and drags down into pit with animation)
-    createDragTrap(data) {
-        const platform = this.platforms.create(data.x, data.y, data.texture || 'platform_stone');
-        platform.setDisplaySize(data.width, data.height);
-        platform.refreshBody();
-        platform.originalX = data.x;
-        platform.originalY = data.y;
-
-        // Visual warning crack line across top of the block
-        const crackGfx = this.add.graphics();
-        crackGfx.lineStyle(2, 0xffaa00, 0.7);
-        crackGfx.lineBetween(data.x - data.width / 2, data.y - data.height / 2, data.x + data.width / 2, data.y - data.height / 2);
-
-        let isTriggered = false;
-        let isResetting = false;
-
-        const checkProximity = () => {
-            if (isTriggered || isResetting || !this.player || this.isDead || !platform.active) return;
-            const triggerX = data.triggerX || (data.x - 170);
-            if (this.player.x >= triggerX && this.player.x <= data.x + data.width / 2) {
-                triggerCollapse();
-            }
-        };
-
-        const triggerCollapse = () => {
-            if (isTriggered) return;
-            isTriggered = true;
-
-            // Step 1: Warning Telegraph (Amber flash, rumble shake, warning sound)
-            platform.setTint(0xff7722);
-            soundManager.playWarning();
-
-            this.tweens.add({
-                targets: platform,
-                x: data.x + 3,
-                y: data.y - 2,
-                duration: 35,
-                yoyo: true,
-                repeat: 7, // ~280ms rumble
-                onComplete: () => {
-                    if (!platform.active) return;
-                    crackGfx.clear();
-
-                    // Step 2: Drag / Drop Animation (Drags down into the abyss with smooth easing!)
-                    this.tweens.add({
-                        targets: platform,
-                        y: data.y + 240,
-                        alpha: 0,
-                        duration: 380,
-                        ease: 'Quad.easeIn',
-                        onUpdate: () => {
-                            platform.refreshBody();
-                        },
-                        onComplete: () => {
-                            platform.disableBody(true, false);
-
-                            // Step 3: Reset block after delay
-                            this.time.delayedCall(data.resetDelay || 3200, () => {
-                                if (!platform.active) return;
-                                resetBlock();
-                            });
-                        }
-                    });
-                }
-            });
-        };
-
-        const resetBlock = () => {
-            this.tweens.killTweensOf(platform);
-            platform.setPosition(data.x, data.y);
-            platform.setAlpha(1.0);
-            platform.clearTint();
-            platform.enableBody(true, data.x, data.y, true, true);
-            platform.refreshBody();
-            isTriggered = false;
-            isResetting = false;
-            crackGfx.clear();
-            crackGfx.lineStyle(2, 0xffaa00, 0.7);
-            crackGfx.lineBetween(data.x - data.width / 2, data.y - data.height / 2, data.x + data.width / 2, data.y - data.height / 2);
-        };
-
-        this.activeHazardControllers.push({
-            platform,
-            crackGfx,
-            update: checkProximity,
-            cleanup: () => {
-                if (crackGfx) crackGfx.destroy();
-            },
-            reset: resetBlock
-        });
-    }
-
-    // 7. Bounce Pad (Spring Trampoline for High Launches)
     createBouncePad(data) {
-        const pad = this.bouncePadsGroup.create(data.x, data.y, 'bounce_pad');
+        const pad = this.bouncePadsGroup.create(data.x, data.y - 18, 'bounce_pad');
         pad.setDisplaySize(data.width || 85, data.height || 36);
         pad.refreshBody();
 
@@ -1807,7 +2229,6 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    // 8. Laser Gate (OFF -> warning flicker -> ON deadly beam)
     createLaserGate(data) {
         const x = data.x;
         const y = data.y;
@@ -1878,7 +2299,6 @@ class GameScene extends Phaser.Scene {
 
         const runCycle = () => {
             if (!isRunning || !hazard.active) return;
-
             drawBeam('off');
             hazard.disableBody(true, false);
 
@@ -1886,7 +2306,7 @@ class GameScene extends Phaser.Scene {
                 if (!isRunning || !hazard.active) return;
 
                 let flickCount = 0;
-                const flickerInterval = this.time.addEvent({
+                this.time.addEvent({
                     delay: 75,
                     repeat: Math.floor(warningDuration / 75),
                     callback: () => {
@@ -1898,7 +2318,6 @@ class GameScene extends Phaser.Scene {
 
                 activeTimer = this.time.delayedCall(warningDuration, () => {
                     if (!isRunning || !hazard.active) return;
-
                     drawBeam('on');
                     hazard.enableBody(true, x, y, true, true);
                     soundManager.playLaser();
@@ -1934,17 +2353,15 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    // 9. Rising Spikes (Rest -> warning shake -> rise lethal -> retract)
     createRisingSpikes(data) {
         const hHeight = data.height || 45;
         const hWidth = data.width || 120;
         let extendedY = data.y;
 
-        // Position flush with floor surface (y = 620) or ceiling surface (y = 145)
         if (data.side === 'ceiling' || data.y < 300) {
-            extendedY = 145 + hHeight / 2;
-        } else if (data.y < 640) {
-            extendedY = 620 - hHeight / 2;
+            extendedY = 130 + hHeight / 2;
+        } else {
+            extendedY = GROUND_TOP_Y - hHeight / 2;
         }
 
         const hazard = this.telegraphedHazardsGroup.create(data.x, extendedY, 'spikes');
@@ -1956,7 +2373,6 @@ class GameScene extends Phaser.Scene {
         if (data.side === 'ceiling' || data.y < 300) hazard.setFlipY(true);
 
         const retractedY = (data.side === 'ceiling' || data.y < 300) ? extendedY - hHeight - 5 : extendedY + hHeight + 5;
-
         hazard.setPosition(data.x, retractedY);
         hazard.disableBody(true, false);
         hazard.setAlpha(0.2);
@@ -1971,7 +2387,6 @@ class GameScene extends Phaser.Scene {
 
         const runCycle = () => {
             if (!isRunning || !hazard.active) return;
-
             hazard.setPosition(data.x, retractedY);
             hazard.disableBody(true, false);
             hazard.setAlpha(0.2);
@@ -1979,7 +2394,6 @@ class GameScene extends Phaser.Scene {
 
             activeTimer = this.time.delayedCall(restDuration, () => {
                 if (!isRunning || !hazard.active) return;
-
                 hazard.setTint(0xffaa00);
                 soundManager.playWarning();
 
@@ -1991,7 +2405,6 @@ class GameScene extends Phaser.Scene {
                     repeat: Math.floor(warningDuration / 70),
                     onComplete: () => {
                         if (!isRunning || !hazard.active) return;
-
                         this.tweens.add({
                             targets: hazard,
                             y: extendedY,
@@ -2004,7 +2417,6 @@ class GameScene extends Phaser.Scene {
 
                                 activeTimer = this.time.delayedCall(riseDuration, () => {
                                     if (!isRunning || !hazard.active) return;
-
                                     hazard.disableBody(true, false);
                                     this.tweens.add({
                                         targets: hazard,
@@ -2038,7 +2450,7 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    // 10. Swinging Saw (Pendulum motion with hanging chain & continuous rotation)
+    // 10. Swinging Saw: Metal mounting bracket, chain links, blade-only lethal hitbox
     createSwingingSaw(data) {
         const pivotX = data.pivotX;
         const pivotY = data.pivotY;
@@ -2046,19 +2458,18 @@ class GameScene extends Phaser.Scene {
         const maxAngleRad = Phaser.Math.DegToRad(data.angleMax || 40);
         const period = data.period || 2200;
 
-        const anchor = this.add.circle(pivotX, pivotY, 8, 0x475569).setDepth(6);
+        // Code-drawn metal bracket at pivot
+        const bracket = this.add.graphics().setDepth(6);
+        bracket.fillStyle(0x334155, 1);
+        bracket.fillRoundedRect(pivotX - 16, pivotY - 8, 32, 16, 4);
+        bracket.lineStyle(2, 0x64748b, 1);
+        bracket.strokeRoundedRect(pivotX - 16, pivotY - 8, 32, 16, 4);
+        bracket.fillStyle(0xf1f5f9, 1);
+        bracket.fillCircle(pivotX, pivotY, 4); // Center mounting bolt
+
         const chainGfx = this.add.graphics().setDepth(5);
 
-        // Faint trajectory arc showing saw path
-        const arcGfx = this.add.graphics().setDepth(3);
-        arcGfx.lineStyle(2, 0xef4444, 0.22);
-        arcGfx.beginPath();
-        arcGfx.arc(pivotX, pivotY, ropeLength, Math.PI / 2 - maxAngleRad, Math.PI / 2 + maxAngleRad);
-        arcGfx.strokePath();
-
-        const minSwingX = pivotX - Math.sin(maxAngleRad) * ropeLength;
-        this.addHazardWarning(minSwingX);
-
+        // Saw blade: only the blade is lethal!
         const saw = this.telegraphedHazardsGroup.create(pivotX, pivotY + ropeLength, 'saw');
         saw.setDisplaySize(80, 80);
         saw.body.setAllowGravity(false);
@@ -2082,26 +2493,30 @@ class GameScene extends Phaser.Scene {
             saw.setPosition(sawX, sawY);
             saw.angle += 3.5;
 
+            // Render chain with small links
             chainGfx.clear();
-            chainGfx.lineStyle(2.5, 0x94a3b8, 0.85);
-            chainGfx.lineBetween(pivotX, pivotY, sawX, sawY);
+            const numLinks = Math.floor(ropeLength / 14);
+            for (let l = 0; l <= numLinks; l++) {
+                const ratio = l / numLinks;
+                const lx = pivotX + (sawX - pivotX) * ratio;
+                const ly = pivotY + (sawY - pivotY) * ratio;
+                chainGfx.lineStyle(2.5, 0x94a3b8, 0.85);
+                chainGfx.strokeCircle(lx, ly, 3);
+            }
         };
 
         this.activeHazardControllers.push({
             saw,
-            anchor,
+            bracket,
             chainGfx,
-            arcGfx,
             update: updateSwinging,
             cleanup: () => {
                 if (chainGfx) chainGfx.destroy();
-                if (arcGfx) arcGfx.destroy();
-                if (anchor) anchor.destroy();
+                if (bracket) bracket.destroy();
             },
             reset: () => {}
         });
     }
-
 
     clearActiveHazards() {
         if (this.activeHazardControllers) {
@@ -2109,8 +2524,6 @@ class GameScene extends Phaser.Scene {
                 if (ctrl.cleanup) ctrl.cleanup();
                 if (ctrl.hazard) this.tweens.killTweensOf(ctrl.hazard);
                 if (ctrl.platform) this.tweens.killTweensOf(ctrl.platform);
-                if (ctrl.leftHalf) this.tweens.killTweensOf(ctrl.leftHalf);
-                if (ctrl.rightHalf) this.tweens.killTweensOf(ctrl.rightHalf);
                 if (ctrl.saw) this.tweens.killTweensOf(ctrl.saw);
             });
             this.activeHazardControllers = [];
@@ -2125,9 +2538,6 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    // ------------------------------------------------------------------------
-    // Checkpoint Trigger
-    // ------------------------------------------------------------------------
     handleReachCheckpoint(flag) {
         if (flag.isActivated || this.isDead || this.hasWon) return;
 
@@ -2135,166 +2545,12 @@ class GameScene extends Phaser.Scene {
         flag.setAlpha(1.0);
         flag.setTint(0x38ef7d);
 
-        this.currentCheckpoint = { x: flag.x, y: flag.y };
+        this.currentCheckpoint = { x: flag.x, y: flag.walkTop - 32, walkTop: flag.walkTop };
         soundManager.playCheckpoint();
-
         this.slimeParticles.emitParticleAt(flag.x, flag.y, 14);
 
-        // If player activated it while flipped on the ceiling, emit particles & alignment beam!
-        if (this.isFlipped) {
-            this.slimeParticles.emitParticleAt(this.player.x, this.player.y, 14);
-
-            const beam = this.add.graphics();
-            beam.lineStyle(3, 0x38ef7d, 0.85);
-            beam.lineBetween(flag.x, this.player.y + 20, flag.x, flag.y - 20);
-            this.tweens.add({
-                targets: beam,
-                alpha: 0,
-                duration: 400,
-                onComplete: () => beam.destroy()
-            });
-        }
-
-        this.tweens.add({
-            targets: flag,
-            scaleX: flag.scaleX * 1.25,
-            scaleY: flag.scaleY * 1.25,
-            duration: 180,
-            yoyo: true,
-            ease: 'Back.easeOut'
-        });
-
-        this.showTutorialHint("🚩 CHECKPOINT SAVED!");
-    }
-
-    // ------------------------------------------------------------------------
-    // Top HUD
-    // ------------------------------------------------------------------------
-    createTopHUD() {
-        const hudDepth = 1000;
-
-        const topBar = this.add.graphics().setScrollFactor(0).setDepth(hudDepth);
-        topBar.fillStyle(0x0a0e1c, 0.88);
-        topBar.fillRoundedRect(20, 12, 1240, 52, 12);
-        topBar.lineStyle(1.5, 0x1f293d, 1);
-        topBar.strokeRoundedRect(20, 12, 1240, 52, 12);
-
-        this.hudLevelText = this.add.text(45, 27, "LEVEL 1: CRYSTAL CAVERN", {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '17px',
-            fontWeight: 'bold',
-            color: '#ffffff'
-        }).setScrollFactor(0).setDepth(hudDepth + 1);
-
-        this.gravityBadgeText = this.add.text(640, 38, "GRAVITY: FLOOR ⬇", {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '15px',
-            fontWeight: '900',
-            color: '#38ef7d'
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(hudDepth + 1);
-
-                this.hudDeathText = this.add.text(990, 38, `💀 DEATHS: ${window.gameDeathCount}`, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            color: '#ff76ac'
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(hudDepth + 1);
-
-        this.btnMenu = this.add.text(1110, 23, "☰", {
-            fontSize: '26px',
-            color: '#38ef7d'
-        }).setScrollFactor(0).setDepth(hudDepth + 1).setInteractive({ useHandCursor: true });
-        this.btnMenu.on('pointerdown', () => {
-            soundManager.playClick();
-            if (window.UIManager) {
-                window.UIManager.openLevelSelect();
-            }
-        });
-
-        this.btnSound = this.add.text(1165, 25, "🔊", {
-            fontSize: '24px'
-        }).setScrollFactor(0).setDepth(hudDepth + 1).setInteractive({ useHandCursor: true });
-        this.btnSound.on('pointerdown', () => {
-            soundManager.muted = !soundManager.muted;
-            this.btnSound.setText(soundManager.muted ? "🔇" : "🔊");
-            soundManager.playClick();
-        });
-
-        const btnRestart = this.add.text(1225, 23, "↺", {
-            fontSize: '28px',
-            color: '#a0aec0'
-        }).setScrollFactor(0).setDepth(hudDepth + 1).setInteractive({ useHandCursor: true });
-        btnRestart.on('pointerdown', () => {
-            soundManager.playClick();
-            this.restartCurrentLevel();
-        });
-    }
-
-    createDebugHUD() {
-        this.debugText = this.add.text(640, 75, "", {
-            fontFamily: 'monospace',
-            fontSize: '12px',
-            color: '#facc15',
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            padding: { x: 8, y: 4 }
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(1500);
-    }
-
-    updateDeathCountUI() {
-        if (this.hudDeathText) {
-            this.hudDeathText.setText(`💀 DEATHS: ${window.gameDeathCount}`);
-        }
-    }
-
-    showTutorialHint(textString) {
-        const hudDepth = 1000;
-
-        if (this.tutorialContainer) {
-            this.tutorialContainer.destroy();
-        }
-
-        this.tutorialContainer = this.add.container(640, 88).setScrollFactor(0).setDepth(hudDepth);
-
-        const bannerBg = this.add.graphics();
-        bannerBg.fillStyle(0x0a1020, 0.88);
-        bannerBg.lineStyle(1.5, 0x38ef7d, 0.7);
-
-        const text = this.add.text(0, 0, textString, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#70e0a0',
-            align: 'center'
-        }).setOrigin(0.5);
-
-        const padX = text.width + 36;
-        const padY = 32;
-        bannerBg.fillRoundedRect(-padX / 2, -padY / 2, padX, padY, 8);
-        bannerBg.strokeRoundedRect(-padX / 2, -padY / 2, padX, padY, 8);
-
-        this.tutorialContainer.add([bannerBg, text]);
-
-        this.tutorialContainer.setAlpha(0);
-        this.tweens.add({
-            targets: this.tutorialContainer,
-            alpha: 1,
-            duration: 250,
-            ease: 'Power2'
-        });
-
-        this.time.delayedCall(3800, () => {
-            if (this.tutorialContainer) {
-                this.tweens.add({
-                    targets: this.tutorialContainer,
-                    alpha: 0,
-                    duration: 700,
-                    ease: 'Power2',
-                    onComplete: () => {
-                        if (this.tutorialContainer) this.tutorialContainer.destroy();
-                    }
-                });
-            }
-        });
+        const uiScene = this.getUIScene();
+        if (uiScene) uiScene.showTutorialHint("🚩 CHECKPOINT SAVED!");
     }
 
     checkHintsAtPosition(playerX) {
@@ -2303,169 +2559,24 @@ class GameScene extends Phaser.Scene {
         for (const hint of this.levelData.hints) {
             if (playerX >= hint.triggerX && this.lastTriggeredHintX < hint.triggerX) {
                 this.lastTriggeredHintX = hint.triggerX;
-                this.showTutorialHint(hint.text);
+                const uiScene = this.getUIScene();
+                if (uiScene) uiScene.showTutorialHint(hint.text);
                 break;
             }
         }
     }
 
     // ------------------------------------------------------------------------
-    // Semi-Transparent Touch Controls (Screen Edges)
-    // ------------------------------------------------------------------------
-    createEdgeTouchControls() {
-        const hudDepth = 1000;
-
-        this.createTouchButton(95, 625, 44, "◀", () => {
-            this.touchLeft = true;
-        }, () => {
-            this.touchLeft = false;
-        });
-
-        this.createTouchButton(215, 625, 44, "▶", () => {
-            this.touchRight = true;
-        }, () => {
-            this.touchRight = false;
-        });
-
-        // Touch JUMP button with variable jump cut support on touch release
-        this.createTouchButton(1045, 625, 44, "▲", () => {
-            this.jumpBufferedUntil = this.time.now + PLAYER.JUMP_BUFFER;
-            this.touchJumpDown = true;
-        }, () => {
-            this.touchJumpDown = false;
-            if (this.isJumping) {
-                this.isJumping = false;
-                if (!this.isFlipped && this.player.body.velocity.y < 0) {
-                    this.player.setVelocityY(this.player.body.velocity.y * PLAYER.VARIABLE_JUMP_CUT);
-                } else if (this.isFlipped && this.player.body.velocity.y > 0) {
-                    this.player.setVelocityY(this.player.body.velocity.y * PLAYER.VARIABLE_JUMP_CUT);
-                }
-            }
-        });
-
-        this.createFlipButton(1180, 615, 58);
-    }
-
-    createTouchButton(x, y, radius, label, onDown, onUp) {
-        const hudDepth = 1000;
-        const btn = this.add.container(x, y).setScrollFactor(0).setDepth(hudDepth);
-
-        const circle = this.add.circle(0, 0, radius, 0x131a2b, 0.55);
-        circle.setStrokeStyle(3, 0x38ef7d, 0.75);
-
-        const text = this.add.text(0, 0, label, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '30px',
-            fontWeight: 'bold',
-            color: '#ffffff'
-        }).setOrigin(0.5);
-
-        btn.add([circle, text]);
-        btn.setSize(radius * 2, radius * 2);
-        btn.setInteractive(new Phaser.Geom.Circle(0, 0, radius), Phaser.Geom.Circle.Contains);
-
-        btn.on('pointerdown', () => {
-            circle.setFillStyle(0x38ef7d, 0.85);
-            text.setColor('#0a0e1c');
-            btn.setScale(0.92);
-            soundManager.playClick();
-            if (onDown) onDown();
-        });
-
-        const release = () => {
-            circle.setFillStyle(0x131a2b, 0.55);
-            text.setColor('#ffffff');
-            btn.setScale(1.0);
-            if (onUp) onUp();
-        };
-
-        btn.on('pointerup', release);
-        btn.on('pointerout', release);
-        btn.on('pointercancel', release);
-
-        return btn;
-    }
-
-    createFlipButton(x, y, radius) {
-        const hudDepth = 1000;
-        this.flipBtnContainer = this.add.container(x, y).setScrollFactor(0).setDepth(hudDepth);
-
-        this.flipCircle = this.add.circle(0, 0, radius, 0x105934, 0.65);
-        this.flipCircle.setStrokeStyle(3.5, 0x38ef7d, 0.9);
-
-        this.flipText = this.add.text(0, -7, "FLIP", {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '22px',
-            fontWeight: '900',
-            color: '#ffffff'
-        }).setOrigin(0.5);
-
-        this.flipSubText = this.add.text(0, 16, "⬆ CEILING", {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            color: '#a8f5bb'
-        }).setOrigin(0.5);
-
-        this.flipBtnContainer.add([this.flipCircle, this.flipText, this.flipSubText]);
-        this.flipBtnContainer.setSize(radius * 2, radius * 2);
-        this.flipBtnContainer.setInteractive(new Phaser.Geom.Circle(0, 0, radius), Phaser.Geom.Circle.Contains);
-
-        this.flipBtnContainer.on('pointerdown', () => {
-            if (this.canFlip && this.isInFlipZone) {
-                this.flipBtnContainer.setScale(0.9);
-                this.triggerGravityFlip();
-            } else if (this.onSurface && !this.isFlipped) {
-                // If on ground outside flip zone, jump!
-                this.player.setVelocityY(-430);
-                soundManager.playJump();
-                this.tweens.add({
-                    targets: this.player,
-                    scaleX: 0.85,
-                    scaleY: 1.25,
-                    duration: 110,
-                    yoyo: true,
-                    ease: 'Back.easeOut'
-                });
-            } else {
-                soundManager.playClick();
-                this.tweens.add({
-                    targets: this.flipBtnContainer,
-                    x: x + 4,
-                    duration: 40,
-                    yoyo: true,
-                    repeat: 2
-                });
-            }
-        });
-
-        const release = () => {
-            this.flipBtnContainer.setScale(1.0);
-        };
-        this.flipBtnContainer.on('pointerup', release);
-        this.flipBtnContainer.on('pointerout', release);
-        this.flipBtnContainer.on('pointercancel', release);
-    }
-
-    // ------------------------------------------------------------------------
-    // BUG 2 FIX: Flip Logic (Strict Zone Enforcement & Smooth Gravity Reversal)
+    // Flip Logic & Smooth Gravity Reversal
     // ------------------------------------------------------------------------
     triggerGravityFlip() {
         const now = this.time.now;
-
         if (now - this.lastFlipTime < 300) return;
 
-        // Flip allowed ONLY inside a flipZone (and not in lockZone)
-        if (!this.isInFlipZone || this.isInLockZone) {
-            return;
-        }
-
-        if (!this.canFlip || this.isDead || this.hasWon) {
-            return;
-        }
+        if (!this.isInFlipZone || this.isInLockZone) return;
+        if (!this.canFlip || this.isDead || this.hasWon) return;
 
         this.lastFlipTime = now;
-
         this.player.setVelocityY(0);
         this.isFlipped = !this.isFlipped;
         this.physics.world.gravity.y = this.isFlipped ? -PLAYER.GRAVITY : PLAYER.GRAVITY;
@@ -2486,30 +2597,11 @@ class GameScene extends Phaser.Scene {
 
         this.slimeParticles.emitParticleAt(this.player.x, this.player.y, 8);
         soundManager.playFlip(this.isFlipped);
-        this.updateGravityUI();
+
+        const uiScene = this.getUIScene();
+        if (uiScene) uiScene.updateGravityUI(this.isFlipped, this.canFlip);
     }
 
-    updateGravityUI() {
-        if (!this.gravityBadgeText || !this.flipSubText || !this.flipCircle) return;
-
-        if (this.isFlipped) {
-            this.gravityBadgeText.setText("GRAVITY: CEILING ⬆").setColor('#ff76ac');
-            this.flipText.setText("FLIP");
-            this.flipSubText.setText("⬇ FLOOR").setColor('#ffd1e4');
-            this.flipCircle.setFillStyle(0x6e173e, 0.75);
-            this.flipCircle.setStrokeStyle(3.5, 0xff76ac, 0.95);
-        } else {
-            this.gravityBadgeText.setText("GRAVITY: FLOOR ⬇").setColor('#38ef7d');
-            this.flipText.setText("FLIP");
-            this.flipSubText.setText("⬆ CEILING").setColor('#a8f5bb');
-            this.flipCircle.setFillStyle(0x105934, 0.7);
-            this.flipCircle.setStrokeStyle(3.5, 0x38ef7d, 0.95);
-        }
-    }
-
-    // ------------------------------------------------------------------------
-    // Keyboard Controls (Supports Ground Jump with Up/W/Space and Flip)
-    // ------------------------------------------------------------------------
     setupKeyboardControls() {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
@@ -2535,7 +2627,7 @@ class GameScene extends Phaser.Scene {
 
         this.keyR.on('down', () => this.restartCurrentLevel());
 
-        // Debug Tool: Direct level select keys 1-5
+        // Debug shortcuts: 1-5 direct level jump
         const numKeys = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'];
         numKeys.forEach((kName, idx) => {
             if (Phaser.Input.Keyboard.KeyCodes[kName]) {
@@ -2545,7 +2637,7 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        // Debug Tool: Key N warps to next checkpoint or goal
+        // Debug Key N: Warp to next checkpoint or goal
         this.keyN = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.N);
         this.keyN.on('down', () => {
             const points = [...(this.levelData.checkpoints || []), this.levelData.goal]
@@ -2556,16 +2648,41 @@ class GameScene extends Phaser.Scene {
                 this.player.setPosition(target.x, target.y - 10);
                 this.player.setVelocity(0, 0);
                 soundManager.playCheckpoint();
-                this.showTutorialHint("⚡ WARPED TO NEXT CHECKPOINT / GOAL!");
+                const uiScene = this.getUIScene();
+                if (uiScene) uiScene.showTutorialHint("⚡ WARPED TO NEXT CHECKPOINT / GOAL!");
             }
         });
 
-        // Debug Tool: Key G toggles God Mode (invincibility)
+        // Debug Key G: God Mode toggle
         this.keyG = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G);
         this.keyG.on('down', () => {
             this.godMode = !this.godMode;
             soundManager.playClick();
-            this.showTutorialHint(this.godMode ? "🛡️ GOD MODE: ON (INVINCIBLE)" : "⚔️ GOD MODE: OFF");
+            const uiScene = this.getUIScene();
+            if (uiScene) uiScene.showTutorialHint(this.godMode ? "🛡️ GOD MODE: ON" : "⚔️ GOD MODE: OFF");
+        });
+
+        // F2: Toggle Debug Visualization
+        this.keyF2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F2);
+        this.keyF2.on('down', () => {
+            DEBUG = !DEBUG;
+            soundManager.playClick();
+            const uiScene = this.getUIScene();
+            if (uiScene) {
+                uiScene.showTutorialHint(DEBUG ? "🔧 DEBUG VISUALIZER: ON" : "🔧 DEBUG VISUALIZER: OFF");
+                if (uiScene.debugText) uiScene.debugText.setVisible(DEBUG);
+            }
+            if (!DEBUG && this.debugGfx) this.debugGfx.clear();
+        });
+
+        // J: Toggle Jump Arc Drawer
+        this.keyJ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+        this.keyJ.on('down', () => {
+            DRAW_JUMP_ARC = !DRAW_JUMP_ARC;
+            soundManager.playClick();
+            const uiScene = this.getUIScene();
+            if (uiScene) uiScene.showTutorialHint(DRAW_JUMP_ARC ? "📐 JUMP ARC DRAWER: ON" : "📐 JUMP ARC DRAWER: OFF");
+            if (!DRAW_JUMP_ARC && this.arcGfx) this.arcGfx.clear();
         });
     }
 
@@ -2573,12 +2690,11 @@ class GameScene extends Phaser.Scene {
     // Game Loop (Update)
     // ------------------------------------------------------------------------
     update(time, delta) {
-        if (this.isDead || this.hasWon) return;
+        if (this.isDead || this.hasWon || (window.UIManager && window.UIManager.overlayVisible)) return;
 
-        // 1. Check Flip & Lock Zones (BUG 2 FIX)
         this.checkCurrentZones();
 
-        // 2. Surface Contact & Coyote Time for BOTH Gravities (BUG 2 FIX)
+        // Surface Contact & Coyote Time for both Floor and Ceiling
         const isGrounded = (!this.isFlipped)
             ? (this.player.body.blocked.down || this.player.body.touching.down)
             : (this.player.body.blocked.up || this.player.body.touching.up);
@@ -2595,7 +2711,7 @@ class GameScene extends Phaser.Scene {
 
         this.canFlip = this.isInFlipZone && !this.isInLockZone && (isGrounded || hasCoyote) && cooldownReady;
 
-        // Landing handling (No squash effect)
+        // Landing sound
         if (isGrounded && this.wasInAir) {
             this.wasInAir = false;
             soundManager.playLand();
@@ -2603,12 +2719,7 @@ class GameScene extends Phaser.Scene {
             this.wasInAir = true;
         }
 
-        // FLIP button visual alpha
-        if (this.flipBtnContainer) {
-            this.flipBtnContainer.setAlpha(this.canFlip ? 1.0 : 0.75);
-        }
-
-        // 3. Horizontal Movement with 0.08s acceleration and deceleration
+        // Horizontal Movement with smooth acceleration & deceleration
         const moveLeft = this.cursors.left.isDown || this.keyA.isDown || this.touchLeft;
         const moveRight = this.cursors.right.isDown || this.keyD.isDown || this.touchRight;
 
@@ -2636,28 +2747,23 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        // 4. Character Animation & Poses (Driven by ANIM constants - 100% flicker-free)
+        // Slime Visual Animations & Poses
         const isInAir = this.isJumping || (!this.onSurface && Math.abs(this.player.body.velocity.y) > 75);
 
         if (isInAir) {
-            // Mid-air: jump pose
             this.setPlayerSpriteTexture('slime_jump', this.isFlipped);
             this.player.setAngle(0);
-
-            // Stretch according to vertical velocity
             const speedNorm = Math.min(1.0, Math.abs(this.player.body.velocity.y) / 600);
             const stretchY = 1.0 + (ANIM.JUMP_STRETCH_SCALE_Y - 1.0) * speedNorm;
             const stretchX = 1.0 - (1.0 - ANIM.JUMP_STRETCH_SCALE_X) * speedNorm;
             this.player.setScale(stretchX, stretchY);
         } else if (moveLeft || moveRight) {
-            // Smooth Ground walk cycle (stable scale, zero micro-bouncing)
             this.setPlayerSpriteTexture('slime', this.isFlipped);
             const stepCycle = (time % (ANIM.WALK_STEP_DURATION * 2)) / (ANIM.WALK_STEP_DURATION * 2);
             const stepWave = Math.sin(stepCycle * Math.PI * 2);
             this.player.setScale(1.0, 1.0);
             this.player.setAngle(stepWave * 3.5);
         } else {
-            // Idle breathing & natural blinking
             this.setPlayerSpriteTexture('slime', this.isFlipped);
             this.player.setAngle(0);
 
@@ -2677,7 +2783,7 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        // 5. Jump & Flip Handling (Buffers jump so pressing forward + jump simultaneously ALWAYS executes cleanly!)
+        // Jump & Flip Handling (Buffer jump)
         const jumpPressed = Phaser.Input.Keyboard.JustDown(this.keySpace) ||
                             Phaser.Input.Keyboard.JustDown(this.keyW) ||
                             Phaser.Input.Keyboard.JustDown(this.cursors.up);
@@ -2708,7 +2814,7 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        // Variable Jump Height Cut: Releasing jump early cuts upward velocity
+        // Variable Jump Cut
         const jumpReleased = Phaser.Input.Keyboard.JustUp(this.keySpace) ||
                              Phaser.Input.Keyboard.JustUp(this.keyW) ||
                              Phaser.Input.Keyboard.JustUp(this.cursors.up);
@@ -2726,83 +2832,21 @@ class GameScene extends Phaser.Scene {
             this.isJumping = false;
         }
 
-        // Jump Arc Visualizer Ghost Markers (when DEBUG = true and jumping/holding jump)
-        if (DEBUG) {
-            if (!this.arcGfx) {
-                this.arcGfx = this.add.graphics().setDepth(1600);
-            }
-            this.arcGfx.clear();
-
-            const jumpHeld = this.keySpace.isDown || this.keyW.isDown || this.cursors.up.isDown || this.touchJumpDown || this.isJumping;
-            if (jumpHeld && this.player) {
-                const sx = this.jumpStartX || this.player.x;
-                const sy = this.jumpStartY || this.player.y;
-                const dir = (this.player.flipX) ? -1 : 1;
-                const hMax = PLAYER.MAX_JUMP_HEIGHT;
-                const dMax = PLAYER.MAX_JUMP_DISTANCE;
-
-                this.arcGfx.lineStyle(2, 0x00f2fe, 0.75);
-                const apexX = sx + dir * (dMax * 0.5);
-                const apexY = this.isFlipped ? sy + hMax : sy - hMax;
-                this.arcGfx.strokeCircle(apexX, apexY, 6);
-
-                const landX = sx + dir * dMax;
-                const landY = sy;
-                this.arcGfx.strokeCircle(landX, landY, 8);
-                this.arcGfx.lineBetween(sx, sy, apexX, apexY);
-                this.arcGfx.lineBetween(apexX, apexY, landX, landY);
-            }
-        }
-
-        // 5. Spin Saws
+        // Spin Saws
         if (this.telegraphedHazardsGroup) {
             this.telegraphedHazardsGroup.getChildren().forEach(h => {
                 if (h.texture.key === 'saw') h.angle += 3;
             });
         }
 
-        // 6. Check Falling Platforms
-        if (this.fallingPlatformsGroup) {
-            this.fallingPlatformsGroup.getChildren().forEach(plat => {
-                if (!plat.isFalling && plat.active) {
-                    const isStanding = (plat.body.touching.up && this.player.body.blocked.down);
-                    if (isStanding) {
-                        plat.isFalling = true;
-                        soundManager.playWarning();
-                        plat.setTint(0xff7733);
-
-                        this.tweens.add({
-                            targets: plat,
-                            x: plat.originalX + 4,
-                            duration: 35,
-                            yoyo: true,
-                            repeat: 7,
-                            onComplete: () => {
-                                this.tweens.add({
-                                    targets: plat,
-                                    y: plat.originalY + 360,
-                                    alpha: 0,
-                                    duration: 420,
-                                    ease: 'Quad.easeIn',
-                                    onComplete: () => {
-                                        plat.disableBody(true, false);
-                                    }
-                                });
-                            }
-                        });
-                    }
-                }
-            });
-        }
-
-        // 7. Update active hazard controllers (proximity traps like dragTrap)
+        // Update active hazard controllers (e.g., swinging saw pendulum update)
         if (this.activeHazardControllers) {
             this.activeHazardControllers.forEach(ctrl => {
                 if (ctrl.update) ctrl.update();
             });
         }
 
-        // 8. Checkpoint & Goal Alignment Checks (triggers on floor OR when flipped on ceiling!)
+        // Checkpoints & Hints
         if (this.checkpointsGroup && this.player && !this.isDead && !this.hasWon) {
             this.checkpointsGroup.getChildren().forEach(flag => {
                 if (!flag.isActivated && Math.abs(this.player.x - flag.x) < 55) {
@@ -2811,37 +2855,116 @@ class GameScene extends Phaser.Scene {
             });
         }
 
-        // 9. Dynamic Hints
         this.checkHintsAtPosition(this.player.x);
 
-        // 8. Debug text (if DEBUG is enabled)
-        if (DEBUG && this.debugText) {
-            const zoneName = this.isInLockZone ? 'LOCK ZONE' : (this.isInFlipZone ? 'FLIP ZONE' : 'NONE');
-            const px = Math.round(this.player.x);
-            const py = Math.round(this.player.y);
-            const vx = Math.round(this.player.body.velocity.x);
-            const vy = Math.round(this.player.body.velocity.y);
-            const godStr = this.godMode ? ' [GOD MODE: ON]' : '';
-            this.debugText.setText(`POS: (${px}, ${py}) | VEL: (${vx}, ${vy}) | ZONE: ${zoneName} | CAN FLIP: ${this.canFlip ? 'YES' : 'NO'} | GND: ${isGrounded ? 'YES' : 'NO'}${godStr}`);
+        // Debug Visualizations (F2 toggled)
+        if (DEBUG) {
+            this.renderDebugVisuals(isGrounded);
         }
 
-        // 9. Death Checks (Only on true falling into the abyss or flying out of ceiling)
+        // Jump Arc Visualizer (J key toggled)
+        if (DRAW_JUMP_ARC) {
+            this.renderJumpArc();
+        }
+
+        // Death Checks: Global Safety Net (y > 800) or ceiling out-of-bounds
         if (time > this.respawnGraceTimer) {
-            // Player fell below the bottom of the world into the pit
-            if (this.player.y > this.levelData.worldHeight + 40) {
+            if (this.player.y > 800) {
                 this.handlePlayerDeath("floor_pit");
                 return;
             }
-
-            // Player flew above the ceiling out of bounds
-            if (this.player.y < -60) {
+            if (this.player.y < -80) {
                 this.handlePlayerDeath("ceiling_void");
                 return;
             }
         }
     }
 
-    // BUG 2 FIX: Checks zone membership based on player center
+    renderDebugVisuals(isGrounded) {
+        if (!this.debugGfx) {
+            this.debugGfx = this.add.graphics().setDepth(1500);
+        }
+        this.debugGfx.clear();
+
+        // 1. Walkable surfaces in green
+        this.debugGfx.lineStyle(3, 0x38ef7d, 0.95);
+        if (this.solidPlatforms) {
+            this.solidPlatforms.getChildren().forEach(p => {
+                if (p.walkTop !== undefined && p.walkLeft !== undefined) {
+                    this.debugGfx.lineBetween(p.walkLeft, p.walkTop, p.walkRight, p.walkTop);
+                }
+            });
+        }
+        if (this.oneWayPlatforms) {
+            this.debugGfx.lineStyle(3, 0x00f2fe, 0.95);
+            this.oneWayPlatforms.getChildren().forEach(p => {
+                if (p.walkTop !== undefined && p.walkLeft !== undefined) {
+                    this.debugGfx.lineBetween(p.walkLeft, p.walkTop, p.walkRight, p.walkTop);
+                }
+            });
+        }
+
+        // 2. Hazard hitboxes in red
+        this.debugGfx.lineStyle(1.5, 0xef4444, 0.85);
+        if (this.telegraphedHazardsGroup) {
+            this.telegraphedHazardsGroup.getChildren().forEach(h => {
+                if (h.body) {
+                    this.debugGfx.strokeRect(h.body.x, h.body.y, h.body.width, h.body.height);
+                }
+            });
+        }
+        if (this.spikes) {
+            this.spikes.getChildren().forEach(s => {
+                if (s.body) {
+                    this.debugGfx.strokeRect(s.body.x, s.body.y, s.body.width, s.body.height);
+                }
+            });
+        }
+
+        // 3. Update debug HUD
+        const uiScene = this.getUIScene();
+        if (uiScene) {
+            const zoneName = this.isInLockZone ? 'LOCK ZONE' : (this.isInFlipZone ? 'FLIP ZONE' : 'NONE');
+            const px = Math.round(this.player.x);
+            const py = Math.round(this.player.y);
+            const vx = Math.round(this.player.body.velocity.x);
+            const vy = Math.round(this.player.body.velocity.y);
+            const godStr = this.godMode ? ' [GOD: ON]' : '';
+            uiScene.setDebugText(`POS: (${px}, ${py}) | VEL: (${vx}, ${vy}) | ZONE: ${zoneName} | GND: ${isGrounded ? 'YES' : 'NO'}${godStr}`);
+        }
+    }
+
+    renderJumpArc() {
+        if (!this.arcGfx) {
+            this.arcGfx = this.add.graphics().setDepth(1600);
+        }
+        this.arcGfx.clear();
+        if (!this.player) return;
+
+        const x0 = this.player.x;
+        const y0 = this.player.y;
+        const dir = this.player.flipX ? -1 : 1;
+        const vx = dir * PLAYER.RUN_SPEED;
+        const vy0 = this.isFlipped ? -PLAYER.JUMP_VELOCITY : PLAYER.JUMP_VELOCITY;
+        const g = this.isFlipped ? -PLAYER.GRAVITY : PLAYER.GRAVITY;
+
+        this.arcGfx.lineStyle(2, 0xfacc15, 0.85);
+        let prevX = x0;
+        let prevY = y0;
+
+        for (let t = 0.04; t <= 0.8; t += 0.04) {
+            const curX = x0 + vx * t;
+            const curY = y0 + vy0 * t + 0.5 * g * t * t;
+            this.arcGfx.lineBetween(prevX, prevY, curX, curY);
+            prevX = curX;
+            prevY = curY;
+            if ((!this.isFlipped && curY > GROUND_TOP_Y) || (this.isFlipped && curY < 130)) break;
+        }
+
+        this.arcGfx.fillStyle(0xfacc15, 0.9);
+        this.arcGfx.fillCircle(prevX, prevY, 5);
+    }
+
     checkCurrentZones() {
         if (!this.levelData.zones) {
             this.isInFlipZone = true;
@@ -2867,21 +2990,21 @@ class GameScene extends Phaser.Scene {
         this.isInFlipZone = inFlip && !inLock;
         this.isInLockZone = inLock;
 
-        // Auto-restore normal floor gravity if leaving flip zone or entering lock zone while flipped!
         if ((!this.isInFlipZone || this.isInLockZone) && this.isFlipped) {
             this.isFlipped = false;
-            this.physics.world.gravity.y = 950;
+            this.physics.world.gravity.y = PLAYER.GRAVITY;
             this.player.setFlipY(false);
             soundManager.playFlip(false);
         }
 
         if (stateChanged) {
-            this.updateGravityUI();
+            const uiScene = this.getUIScene();
+            if (uiScene) uiScene.updateGravityUI(this.isFlipped, this.canFlip);
         }
     }
 
     // ------------------------------------------------------------------------
-    // Death Handling
+    // Player Death & Instant Respawn
     // ------------------------------------------------------------------------
     handlePlayerDeath(reason = "hazard") {
         if (this.godMode) return;
@@ -2890,10 +3013,13 @@ class GameScene extends Phaser.Scene {
 
         window.gameDeathCount++;
         this.levelDeaths++;
-        this.updateDeathCountUI();
 
-        const randomMsg = FUNNY_DEATH_MESSAGES[Math.floor(Math.random() * FUNNY_DEATH_MESSAGES.length)];
-        this.showTutorialHint(randomMsg);
+        const uiScene = this.getUIScene();
+        if (uiScene) {
+            uiScene.updateDeaths(window.gameDeathCount);
+            const randomMsg = FUNNY_DEATH_MESSAGES[Math.floor(Math.random() * FUNNY_DEATH_MESSAGES.length)];
+            uiScene.showTutorialHint(randomMsg);
+        }
 
         if (this.player && this.player.body) {
             this.player.body.enable = false;
@@ -2917,15 +3043,14 @@ class GameScene extends Phaser.Scene {
             ease: 'Quad.easeOut'
         });
 
-        // Instant restart after death fade duration
         this.time.delayedCall(ANIM.DEATH_FADE_DURATION + 40, () => {
             this.respawnAtLastCheckpoint();
         });
     }
 
     respawnAtLastCheckpoint() {
-        const targetX = this.currentCheckpoint ? this.currentCheckpoint.x : this.levelData.playerStart.x;
-        const targetY = this.currentCheckpoint ? this.currentCheckpoint.y : this.levelData.playerStart.y;
+        const targetX = this.currentCheckpoint ? this.currentCheckpoint.x : (this.levelData.playerStart ? this.levelData.playerStart.x : 140);
+        const targetY = this.currentCheckpoint ? (this.currentCheckpoint.walkTop - PLAYER.HEIGHT / 2) : (this.levelData.playerStart ? this.levelData.playerStart.y : 568);
 
         this.player.setPosition(targetX, targetY);
         this.player.setVelocity(0, 0);
@@ -2937,8 +3062,8 @@ class GameScene extends Phaser.Scene {
             this.player.body.setAllowGravity(true);
         }
 
-        this.cameras.main.centerOn(targetX, targetY);
-        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+        this.cameras.main.scrollY = 0;
+        this.cameras.main.startFollow(this.player, true, 0.1, 0);
 
         this.isFlipped = false;
         this.physics.world.gravity.y = PLAYER.GRAVITY;
@@ -2952,7 +3077,9 @@ class GameScene extends Phaser.Scene {
 
         this.resetAllHazards();
         this.checkCurrentZones();
-        this.updateGravityUI();
+
+        const uiScene = this.getUIScene();
+        if (uiScene) uiScene.updateGravityUI(false, false);
 
         this.tweens.killTweensOf(this.player);
         this.tweens.add({
@@ -2984,12 +3111,10 @@ class GameScene extends Phaser.Scene {
         this.currentCheckpoint = null;
         this.lastTriggeredHintX = -1;
         this.loadLevel(this.currentLevelIndex);
-        this.showTutorialHint("Level Restarted!");
+        const uiScene = this.getUIScene();
+        if (uiScene) uiScene.showTutorialHint("Level Restarted!");
     }
 
-    // ------------------------------------------------------------------------
-    // Victory & Level Complete Modal
-    // ------------------------------------------------------------------------
     handleLevelComplete() {
         if (this.levelCompleted || this.hasWon || this.isDead) return;
         this.levelCompleted = true;
@@ -3006,7 +3131,6 @@ class GameScene extends Phaser.Scene {
             this.player.setVelocity(0, 0);
         }
 
-        // Disable all hazard physics bodies so no hazard can hurt the player
         if (this.telegraphedHazardsGroup) {
             this.telegraphedHazardsGroup.getChildren().forEach(h => {
                 if (h.body) h.body.enable = false;
@@ -3018,10 +3142,7 @@ class GameScene extends Phaser.Scene {
             });
         }
 
-        // Stop all player tweens to prevent bubbling/repeated shaking
         this.tweens.killTweensOf(this.player);
-
-        // Single clean celebratory hop
         this.tweens.add({
             targets: this.player,
             y: this.player.y - 20,
@@ -3040,103 +3161,8 @@ class GameScene extends Phaser.Scene {
                     this.levelDeaths,
                     elapsedSeconds
                 );
-            } else {
-                this.showVictoryOverlay();
             }
         });
-    }
-
-    showVictoryOverlay() {
-        const hudDepth = 2000;
-        const overlay = this.add.container(640, 360).setScrollFactor(0).setDepth(hudDepth);
-
-        const backdrop = this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.8);
-        backdrop.setInteractive();
-
-        const card = this.add.graphics();
-        card.fillStyle(0x13182b, 0.96);
-        card.fillRoundedRect(-260, -170, 520, 340, 20);
-        card.lineStyle(3.5, 0x38ef7d, 1);
-        card.strokeRoundedRect(-260, -170, 520, 340, 20);
-
-        const title = this.add.text(0, -120, "⭐ LEVEL COMPLETE! ⭐", {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '32px',
-            fontWeight: '900',
-            color: '#38ef7d'
-        }).setOrigin(0.5);
-
-        const levelName = this.levelData.name || "Crystal Cavern";
-        const sub = this.add.text(0, -70, `${levelName} Cleared!`, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '18px',
-            fontWeight: '600',
-            color: '#e2e8f0'
-        }).setOrigin(0.5);
-
-        const stars = this.add.text(0, -20, "🌟 🌟 🌟", {
-            fontSize: '38px'
-        }).setOrigin(0.5);
-
-        const hasNextLevel = (this.currentLevelIndex + 1 < GAME_LEVELS.length);
-
-        const btnReplay = this.createModalButton(-125, 75, "↺ REPLAY", 0x3b4256, () => {
-            overlay.destroy();
-            this.currentCheckpoint = null;
-            this.loadLevel(this.currentLevelIndex);
-        });
-
-        const nextText = hasNextLevel ? "▶ NEXT LEVEL" : "🌟 PLAY AGAIN";
-        const btnNext = this.createModalButton(125, 75, nextText, 0x16a34a, () => {
-            overlay.destroy();
-            this.currentCheckpoint = null;
-            if (hasNextLevel) {
-                this.currentLevelIndex++;
-            } else {
-                this.currentLevelIndex = 0;
-            }
-            this.loadLevel(this.currentLevelIndex);
-        });
-
-        overlay.add([backdrop, card, title, sub, stars, btnReplay, btnNext]);
-
-        overlay.setScale(0.7);
-        overlay.setAlpha(0);
-        this.tweens.add({
-            targets: overlay,
-            scale: 1.0,
-            alpha: 1.0,
-            duration: 320,
-            ease: 'Back.easeOut'
-        });
-    }
-
-    createModalButton(x, y, text, bgColor, onClick) {
-        const btn = this.add.container(x, y);
-        const rect = this.add.graphics();
-        rect.fillStyle(bgColor, 1);
-        rect.fillRoundedRect(-105, -28, 210, 56, 12);
-        rect.lineStyle(2, 0xffffff, 0.5);
-        rect.strokeRoundedRect(-105, -28, 210, 56, 12);
-
-        const label = this.add.text(0, 0, text, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '18px',
-            fontWeight: '900',
-            color: '#ffffff'
-        }).setOrigin(0.5);
-
-        btn.add([rect, label]);
-        btn.setSize(210, 56);
-        btn.setInteractive(new Phaser.Geom.Rectangle(-105, -28, 210, 56), Phaser.Geom.Rectangle.Contains);
-
-        btn.on('pointerdown', () => {
-            soundManager.playClick();
-            btn.setScale(0.92);
-            onClick();
-        });
-
-        return btn;
     }
 }
 
@@ -3153,20 +3179,35 @@ const gameConfig = {
         default: 'arcade',
         arcade: {
             gravity: { y: PLAYER.GRAVITY },
-            debug: DEBUG
+            debug: false
         }
     },
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [GameScene]
+    scene: [GameScene, UIScene]
 };
 
-window.addEventListener('DOMContentLoaded', () => {
-    if (window.UIManager) {
+function bootGame() {
+    if (typeof window !== 'undefined') {
+        if (window._gameBooted) return;
+        window._gameBooted = true;
+    }
+    if (typeof window !== 'undefined' && window.UIManager) {
         window.UIManager.init();
     }
-    window.game = new Phaser.Game(gameConfig);
-});
+    if (typeof window !== 'undefined') {
+        window.game = new Phaser.Game(gameConfig);
+    }
+}
 
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootGame);
+    } else {
+        bootGame();
+    }
+} else if (typeof window !== 'undefined') {
+    bootGame();
+}

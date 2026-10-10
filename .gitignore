@@ -1,4 +1,12 @@
 scratch/
 *.log
 test_validator.js
-
+assets/_gemini_originals/
+assets/_not_assets/
+assets/_concept_ref/
+assets/*dirty.png
+assets/zone 1/
+assets/zone 2/
+assets/zone 3/
+assets/zone 4/
+assets/zone 5/

@@ -1,0 +1,566 @@
+{
+  "zone": "Zone 1: Crystal Cavern",
+  "asset_directory": "assets/zone1/",
+  "max_dimension_px": 512,
+  "max_background_width_px": 1920,
+  "size_warning_threshold_kb": 400.0,
+  "assets": {
+    "zone1_plat_tiny.png": {
+      "file": "zone1_plat_tiny.png",
+      "source_file": "zone1_plat_tiny.png",
+      "role": "platform",
+      "size_px": [
+        486,
+        407
+      ],
+      "file_size_kb": 182.0,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "surface_y": 38,
+      "solid_rect": [
+        24,
+        38,
+        437,
+        281
+      ],
+      "ceiling": false,
+      "walkLeft": 14,
+      "walkRight": 472,
+      "walkTop": 28
+    },
+    "zone1_plat_small.png": {
+      "file": "zone1_plat_small.png",
+      "source_file": "zone1_plat_small.png",
+      "role": "platform",
+      "size_px": [
+        512,
+        230
+      ],
+      "file_size_kb": 118.4,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "surface_y": 20,
+      "solid_rect": [
+        15,
+        20,
+        481,
+        140
+      ],
+      "ceiling": false,
+      "walkLeft": 12,
+      "walkRight": 500,
+      "walkTop": 15
+    },
+    "zone1_plat_medium.png": {
+      "file": "zone1_plat_medium.png",
+      "source_file": "zone1_plat_medium.png",
+      "role": "platform",
+      "size_px": [
+        512,
+        180
+      ],
+      "file_size_kb": 87.8,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "surface_y": 15,
+      "solid_rect": [
+        10,
+        15,
+        492,
+        101
+      ],
+      "ceiling": false,
+      "walkLeft": 8,
+      "walkRight": 504,
+      "walkTop": 10
+    },
+    "zone1_ground_long.png": {
+      "file": "zone1_ground_long.png",
+      "source_file": "zone1_ground_long.png",
+      "role": "platform",
+      "size_px": [
+        512,
+        64
+      ],
+      "file_size_kb": 43.9,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "surface_y": 10,
+      "solid_rect": [
+        5,
+        10,
+        502,
+        50
+      ],
+      "ceiling": false,
+      "walkLeft": 4,
+      "walkRight": 508,
+      "walkTop": 2
+    },
+    "zone1_pillar.png": {
+      "file": "zone1_pillar.png",
+      "source_file": "zone1_pillar.png",
+      "role": "platform",
+      "size_px": [
+        266,
+        512
+      ],
+      "file_size_kb": 165.9,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "surface_y": 24,
+      "solid_rect": [
+        16,
+        24,
+        234,
+        481
+      ],
+      "ceiling": false,
+      "walkLeft": 10,
+      "walkRight": 256,
+      "walkTop": 18
+    },
+    "zone1_wall.png": {
+      "file": "zone1_wall.png",
+      "source_file": "zone1_wall.png",
+      "role": "platform",
+      "size_px": [
+        255,
+        512
+      ],
+      "file_size_kb": 154.6,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "surface_y": 10,
+      "solid_rect": [
+        10,
+        10,
+        235,
+        497
+      ],
+      "ceiling": false,
+      "walkLeft": 8,
+      "walkRight": 248,
+      "walkTop": 8
+    },
+    "zone1_ceiling.png": {
+      "file": "zone1_ceiling.png",
+      "source_file": "zone1_ceiling.png",
+      "role": "platform",
+      "size_px": [
+        512,
+        99
+      ],
+      "file_size_kb": 63.7,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "surface_y": 92,
+      "solid_rect": [
+        10,
+        8,
+        492,
+        84
+      ],
+      "ceiling": true,
+      "walkLeft": 8,
+      "walkRight": 504,
+      "walkTop": 95
+    },
+    "zone1_ceil_float.png": {
+      "file": "zone1_ceil_float.png",
+      "source_file": "zone1_ceil_float.png",
+      "role": "platform",
+      "size_px": [
+        512,
+        149
+      ],
+      "file_size_kb": 81.1,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "surface_y": 136,
+      "solid_rect": [
+        15,
+        36,
+        481,
+        100
+      ],
+      "ceiling": true,
+      "walkLeft": 10,
+      "walkRight": 502,
+      "walkTop": 140
+    },
+    "platform_stone.png": {
+      "file": "platform_stone.png",
+      "source_file": "platform_stone.png",
+      "role": "platform",
+      "size_px": [
+        512,
+        292
+      ],
+      "file_size_kb": 187.1,
+      "transparent": true,
+      "status": "clean",
+      "size_warning": false,
+      "surface_y": 35,
+      "solid_rect": [
+        10,
+        35,
+        492,
+        239
+      ],
+      "ceiling": false
+    },
+    "platform_metal.png": {
+      "file": "platform_metal.png",
+      "source_file": "platform_metal.png",
+      "role": "platform",
+      "size_px": [
+        512,
+        220
+      ],
+      "file_size_kb": 146.8,
+      "transparent": true,
+      "status": "clean",
+      "size_warning": false,
+      "surface_y": 18,
+      "solid_rect": [
+        5,
+        18,
+        502,
+        198
+      ],
+      "ceiling": false,
+      "walkLeft": 4,
+      "walkRight": 508,
+      "walkTop": 12
+    },
+    "saw.png": {
+      "file": "saw.png",
+      "source_file": "saw.png",
+      "role": "hazard",
+      "size_px": [
+        504,
+        443
+      ],
+      "file_size_kb": 280.4,
+      "transparent": true,
+      "status": "clean",
+      "size_warning": false
+    },
+    "spikes.png": {
+      "file": "spikes.png",
+      "source_file": "spikes.png",
+      "role": "hazard",
+      "size_px": [
+        512,
+        340
+      ],
+      "file_size_kb": 170.8,
+      "transparent": true,
+      "status": "clean",
+      "size_warning": false
+    },
+    "falling_platform.png": {
+      "file": "falling_platform.png",
+      "source_file": "falling plategform.png",
+      "role": "hazard",
+      "size_px": [
+        512,
+        371
+      ],
+      "file_size_kb": 111.8,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "bounce_pad.png": {
+      "file": "bounce_pad.png",
+      "source_file": "bounce_pad.png",
+      "role": "object",
+      "size_px": [
+        512,
+        257
+      ],
+      "file_size_kb": 183.4,
+      "transparent": true,
+      "status": "clean",
+      "size_warning": false
+    },
+    "bounce_pad_up.png": {
+      "file": "bounce_pad_up.png",
+      "source_file": "bouncepad up.png",
+      "role": "object",
+      "size_px": [
+        512,
+        124
+      ],
+      "file_size_kb": 77.3,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "bounce_pad_down.png": {
+      "file": "bounce_pad_down.png",
+      "source_file": "boucepad down direction.png",
+      "role": "object",
+      "size_px": [
+        512,
+        162
+      ],
+      "file_size_kb": 87.7,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "checkpoint_flag.png": {
+      "file": "checkpoint_flag.png",
+      "source_file": "checkpoint_flag.png",
+      "role": "object",
+      "size_px": [
+        318,
+        512
+      ],
+      "file_size_kb": 88.5,
+      "transparent": true,
+      "status": "clean",
+      "size_warning": false
+    },
+    "goal_flag.png": {
+      "file": "goal_flag.png",
+      "source_file": "goal_flag.png",
+      "role": "object",
+      "size_px": [
+        318,
+        512
+      ],
+      "file_size_kb": 97.2,
+      "transparent": true,
+      "status": "clean",
+      "size_warning": false
+    },
+    "obs_turret.png": {
+      "file": "obs_turret.png",
+      "source_file": "obs_turret.png",
+      "role": "obstacle",
+      "size_px": [
+        512,
+        371
+      ],
+      "file_size_kb": 169.2,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "obs_bullet.png": {
+      "file": "obs_bullet.png",
+      "source_file": "obs_bullet.png",
+      "role": "obstacle",
+      "size_px": [
+        512,
+        278
+      ],
+      "file_size_kb": 119.2,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "obs_conveyor.png": {
+      "file": "obs_conveyor.png",
+      "source_file": "obs_conveyor.png",
+      "role": "obstacle",
+      "size_px": [
+        512,
+        103
+      ],
+      "file_size_kb": 83.4,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "obs_crusher.png": {
+      "file": "obs_crusher.png",
+      "source_file": "obs_crusher.png",
+      "role": "obstacle",
+      "size_px": [
+        512,
+        421
+      ],
+      "file_size_kb": 270.0,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "zone1_decor_rocks.png": {
+      "file": "zone1_decor_rocks.png",
+      "source_file": "zone1_decor_rocks.png",
+      "role": "decor",
+      "size_px": [
+        512,
+        231
+      ],
+      "file_size_kb": 105.9,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "zone1_decor_stalactite.png": {
+      "file": "zone1_decor_stalactite.png",
+      "source_file": "zone1_decor_stalactite.png",
+      "role": "decor",
+      "size_px": [
+        225,
+        512
+      ],
+      "file_size_kb": 73.1,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "zone1_background.png": {
+      "file": "zone1_background.png",
+      "source_file": "zone 1background.png",
+      "role": "background",
+      "size_px": [
+        1920,
+        1072
+      ],
+      "file_size_kb": 2340.0,
+      "transparent": false,
+      "status": "cleaned",
+      "size_warning": true
+    },
+    "swing_saw.png": {
+      "file": "swing_saw.png",
+      "source_file": "saw_layout.png",
+      "role": "hazard",
+      "size_px": [
+        372,
+        512
+      ],
+      "file_size_kb": 170.8,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "measurements": {
+        "pivot_point": [
+          186,
+          25
+        ],
+        "saw_blade_center": [
+          186,
+          335
+        ],
+        "blade_radius": 168,
+        "chain_length": 310
+      }
+    },
+    "rising_spikes.png": {
+      "file": "rising_spikes.png",
+      "source_file": "rising_spikes.png",
+      "role": "hazard",
+      "size_px": [
+        512,
+        262
+      ],
+      "file_size_kb": 134.0,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "measurements": {
+        "spike_area_rect": [
+          68,
+          6,
+          376,
+          163
+        ],
+        "base_top_surface_y": 169,
+        "base_rect": [
+          4,
+          169,
+          504,
+          89
+        ],
+        "spike_count": 5
+      }
+    },
+    "slide_spike.png": {
+      "file": "slide_spike.png",
+      "source_file": "slide_spike.png",
+      "role": "hazard",
+      "size_px": [
+        394,
+        512
+      ],
+      "file_size_kb": 225.4,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "measurements": {
+        "spike_area_rect": [
+          6,
+          48,
+          231,
+          416
+        ],
+        "wall_plate_rect": [
+          237,
+          4,
+          153,
+          504
+        ],
+        "spike_direction": "left",
+        "spike_count": 4
+      }
+    },
+    "trap_plate_wall.png": {
+      "file": "trap_plate_wall.png",
+      "source_file": "trap_plate_wall.png",
+      "role": "obstacle",
+      "size_px": [
+        278,
+        512
+      ],
+      "file_size_kb": 165.1,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false,
+      "measurements": {
+        "wall_plate_rect": [
+          4,
+          4,
+          270,
+          504
+        ],
+        "slot_area_rect": [
+          36,
+          44,
+          184,
+          424
+        ]
+      }
+    }
+  },
+  "needs_regeneration": [
+    {
+      "standard_name": "boucepad (duplicate)",
+      "src_file": "boucepad.png",
+      "role": "object",
+      "reason": "Infographic diagram explaining bounce pad mechanics; superseded by clean bounce_pad, bounce_pad_up, and bounce_pad_down."
+    }
+  ],
+  "missing_names": [
+    {
+      "standard_name": "trap_plate_floor",
+      "status": "not_yet_created",
+      "note": "trap_plate_wall was provided and cleaned, but trap_plate_floor does not exist in assets yet."
+    }
+  ]
+}
