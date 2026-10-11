@@ -39,12 +39,16 @@
             justify-content: center;
             align-items: center;
             position: relative;
+            outline: none !important;
+            -webkit-tap-highlight-color: transparent !important;
         }
 
         canvas {
             display: block;
             margin: auto;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+            outline: none !important;
+            -webkit-tap-highlight-color: transparent !important;
         }
 
         /* ====================================================================
@@ -549,25 +553,43 @@
                 <div class="level-card unlocked" onclick="selectGameLevel(1);">
                     <div class="level-badge">LEVEL 2</div>
                     <div class="level-num-display">2</div>
-                    <div class="level-card-name">Granite Grotto</div>
+                    <div class="level-card-name">Ancient Slabs</div>
                     <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
                 </div>
                 <div class="level-card unlocked" onclick="selectGameLevel(2);">
                     <div class="level-badge">LEVEL 3</div>
                     <div class="level-num-display">3</div>
-                    <div class="level-card-name">Magma Vault</div>
+                    <div class="level-card-name">Pillar Steps</div>
                     <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
                 </div>
                 <div class="level-card unlocked" onclick="selectGameLevel(3);">
                     <div class="level-badge">LEVEL 4</div>
                     <div class="level-num-display">4</div>
-                    <div class="level-card-name">Gravity Citadel</div>
+                    <div class="level-card-name">Spike Valley</div>
                     <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
                 </div>
                 <div class="level-card unlocked" onclick="selectGameLevel(4);">
                     <div class="level-badge">LEVEL 5</div>
                     <div class="level-num-display">5</div>
-                    <div class="level-card-name">Astral Core</div>
+                    <div class="level-card-name">Mossy Respite</div>
+                    <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
+                </div>
+                <div class="level-card unlocked" onclick="selectGameLevel(5);">
+                    <div class="level-badge">LEVEL 6</div>
+                    <div class="level-num-display">6</div>
+                    <div class="level-card-name">Moving Machinery</div>
+                    <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
+                </div>
+                <div class="level-card unlocked" onclick="selectGameLevel(6);">
+                    <div class="level-badge">LEVEL 7</div>
+                    <div class="level-num-display">7</div>
+                    <div class="level-card-name">The Inversion Core</div>
+                    <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
+                </div>
+                <div class="level-card unlocked" onclick="selectGameLevel(7);">
+                    <div class="level-badge">LEVEL 8</div>
+                    <div class="level-num-display">8</div>
+                    <div class="level-card-name">Ceiling Runner</div>
                     <div class="stars-row"><span class="star-item earned">★</span><span class="star-item">★</span><span class="star-item">★</span></div>
                 </div>
             </div>
@@ -623,7 +645,11 @@
             if (overlay) overlay.style.display = 'none';
 
             if (window.UIManager) {
-                window.UIManager.overlayVisible = false;
+                if (typeof window.UIManager.hideOverlay === 'function') {
+                    window.UIManager.hideOverlay();
+                } else {
+                    window.UIManager.overlayVisible = false;
+                }
                 if (window.UIManager.scene && typeof window.UIManager.scene.startLevelFromMenu === 'function') {
                     window.UIManager.scene.startLevelFromMenu(idx);
                     return;
@@ -667,8 +693,8 @@
         window.playGame = onPlayButtonClick;
     </script>
     <script src="phaser.min.js"></script>
-    <script src="assets.js"></script>
-    <script src="levels.js?v=3.6"></script>
-    <script src="game.js?v=3.6"></script>
+    <script src="assets.js?v=6.6"></script>
+    <script src="levels.js?v=6.6"></script>
+    <script src="game.js?v=6.6"></script>
 </body>
 </html>

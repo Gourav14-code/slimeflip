@@ -1,0 +1,313 @@
+================================================================================
+SLIME FLIP: 2D PLATFORMER - COMPLETE SYSTEM ARCHITECTURE & MASTER AGENT PROMPT
+================================================================================
+Document Purpose:
+This document contains the complete technical summary, mathematical logic,
+physics engine rules, and level-by-level architecture of Slime Flip.
+Use the "READY-TO-USE MASTER AGENT PROMPT" below to onboard any AI coding agent
+or developer whenever modifying or migrating the codebase.
+
+================================================================================
+SECTION 1: READY-TO-USE MASTER AGENT PROMPT (COPY-PASTE FOR NEW AGENTS)
+================================================================================
+```markdown
+You are an expert game developer and systems architect working on "Slime Flip",
+a polished, precision 2D physics platformer built with Phaser 3 (v3.80.1), HTML5 Canvas,
+and vanilla JavaScript.
+
+### CORE GAMEPLAY OVERVIEW
+The player controls a green slime navigating high-precision cave levels.
+Key mechanics include fluid movement, variable jump height, one-way floating platforms,
+bounce pads, swinging chain saws, stalactite traps, and mid-level Gravity Inversion
+(flipping gravity between floor and ceiling inside designated Flip Zones).
+
+### CRITICAL TECHNICAL CONSTRAINTS & ARCHITECTURAL RULES
+1. SCREEN & DISPLAY:
+   - Fixed 16:9 canvas: 1280 x 720 px.
+   - Phaser scale mode: Phaser.Scale.FIT with autoCenter: Phaser.Scale.CENTER_BOTH.
+   - Camera Y-axis is locked (scrollY = 0). The camera follows the player ONLY on the X-axis (lerp: 0.1, 0).
+   - Parallax background scrolls on the X-axis only (scrollFactor: 0.2, 0).
+
+2. PHYSICS & KINEMATICS CALIBRATION (DO NOT ALTER ARBITRARILY):
+   - World Gravity: 1500 px/s^2.
+   - Run Speed: 260 px/s with acceleration & deceleration time of 0.08s (smooth momentum).
+   - Jump Velocity: -690 px/s (upward) or +690 px/s (downward when flipped).
+   - Variable Jump Cut: Releasing Jump early multiplies current vertical velocity by 0.5.
+   - Max Peak Jump Height: 155 px (h = v^2 / (2g)).
+   - Safe Step-Up Limit: 110 px (15% safety margin on peak jump).
+   - Safe Horizontal Jump Gap: 145 px (max theoretical 240 px).
+   - Surface Clearance: 105 px minimum between floor and ceiling/obstacles.
+   - Coyote Time: 100 ms buffer after walking off ledges.
+   - Jump Buffer: 100 ms input buffer before landing.
+   - Max Fall Speed: 900 px/s.
+
+3. BASE GROUND & SEAMLESS 3-SLICE SYSTEM:
+   - Standard Ground Surface: y = 600 px (GROUND_TOP_Y = 600).
+   - Ground extends from y = 600 down to the screen bottom y = 720 (120 px thick).
+   - Ground slabs use seamless 3-slice visual construction:
+     - Left end-cap sprite at walkLeft.
+     - Repeating middle sprites alternating flipX with 2px overlap.
+     - Right end-cap sprite terminating at walkRight.
+   - Each ground slab uses EXACTLY ONE merged static Phaser Arcade collider.
+   - Pits interrupt the ground slab (e.g. ground slab 1 ends at pit.x, slab 2 resumes at pit.x + pit.w).
+   - In pits, a dark abyss gradient (black-purple gradient with rising particles) renders below y = 600.
+   - Pit death triggers are placed at y = 690, with an ultimate safety net at y > 800.
+
+4. PLATFORMS & COLLIDERS:
+   - High-Route Floating Platforms:
+     - Tiers: y = 510, 480, 420, 330, 240.
+     - They MUST be ONE-WAY colliders (24px slab at the walkable surface).
+     - Downward collision only: Player can jump UP through them from underneath without bumping heads.
+     - Landing on top only registers when falling downward (`velocity.y >= 0` and `prevBottom <= walkTop + 16`).
+   - Ceiling Platforms:
+     - Flat walking bottom surface at y = 130 px (leaving 130 px for HUD/UI bar).
+     - When gravity is flipped, player stands upside-down at y = 130.
+   - Inverted Floating Islands (`ceilFloat`):
+     - Native art has flat surface on bottom with rocks above.
+     - When used as pit-jumping platforms (`ceiling: false`), flip sprite vertically (`setFlipY(true)`) so flat walking surface is at the TOP (at specified y), with crystals dangling below into the pit.
+     - Collider must have `isCeiling: false` and check collision from above.
+
+5. GRAVITY INVERSION MECHANIC:
+   - Gravity Flip is permitted ONLY when the player is inside a `flipZone` (`levelData.zones`).
+   - Triggered by pressing 'F' or tapping the UI 'FLIP' button.
+   - When flipped, world gravity becomes -1500 (upward).
+   - Upward launch impulse: velocityY = -200 (or +200 when flipping back to floor).
+   - Slime sprite switches to upside-down texture (`slime_upside.png`) and plays flip squash tween.
+   - Lock Zone (`lockZone` / pit lock): If player is flipped and directly above an open floor pit, flipping back to floor is locked to prevent falling straight into the void.
+   - Ceiling Void Safety Rule: If flipped and player flies above y < -80, or walks off ceiling into empty sky outside a platform, death triggers instantly (`ceiling_void`).
+   - Auto-Revert Rule: If player leaves `flipZone` or reaches the end of the ceiling bridge, gravity automatically smoothly returns to normal floor gravity (+1500).
+
+6. DUAL SCENE ARCHITECTURE:
+   - `GameScene`: Handles world physics, camera follow, parallax background, tile rendering, hazards, player state.
+   - `UIScene`: Runs simultaneously in parallel with a fixed camera. Renders the top HUD (Deaths counter, Level title, Gravity indicator badge), and bottom on-screen touch buttons (Left, Right, Jump, Flip).
+   - DOM UI (`index.html`): High-contrast glassmorphic overlay for Start Menu, Level Select modal, and Level Complete modal. Pauses gameplay when visible.
+
+7. ZERO EXTERNAL AUDIO ASSET DEPENDENCY:
+   - All sound effects (Jump, Land, Bounce, Flip, Saw Warning, Checkpoint, Goal, Death, Click) are procedurally synthesized in real time via the Web Audio API (`AudioContext`) inside `soundManager`. No external audio files to fail loading.
+
+8. AUTOMATED VALIDATION & GAP TABLE:
+   - Every level is mathematically verified at boot time via `validateLevel()` and `canReach()`.
+   - Checks every gap and step-up against parabolic kinematic equations.
+   - Prints a formatted console gap table on load with zero errors.
+```
+
+================================================================================
+SECTION 2: COMPLETE ARCHITECTURAL SPECIFICATIONS & MATHEMATICAL LOGIC
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1 KINEMATICS & PARABOLIC JUMP MATH
+--------------------------------------------------------------------------------
+Under constant gravity $g$ and initial vertical velocity $v_0$:
+- Time to apex:
+  $t_{apex} = \frac{|v_0|}{g} = \frac{690}{1500} = 0.46\text{ seconds}$
+- Maximum theoretical jump height:
+  $h_{apex} = \frac{v_0^2}{2g} = \frac{690^2}{3000} = 158.7\text{ px}$ (Calibrated as 155 px)
+- Safe step-up limit (with 15% player margin):
+  $h_{safe} = 155 \times 0.85 \approx 131\text{ px}$ (Strict design rule: $\le 110\text{ px}$)
+- Total flight time on level ground:
+  $t_{total} = 2 \times t_{apex} = 0.92\text{ seconds}$
+- Maximum horizontal travel distance at $v_x = 260\text{ px/s}$:
+  $d_{max} = v_x \times t_{total} = 260 \times 0.92 = 239.2\text{ px}$
+- Safe horizontal jump gap (with 15% player margin):
+  $d_{safe} = 239.2 \times 0.85 \approx 203\text{ px}$ (Strict level design gap rule: $\le 145\text{ px}$)
+
+--------------------------------------------------------------------------------
+2.2 SURFACE & PLATFORM TIERS
+--------------------------------------------------------------------------------
+- Floor Ground Surface: $y = 600\text{ px}$ (Screen bottom is $y = 720$)
+- Low High Route: $y = 510\text{ px}$ (Step-up from ground: $90\text{ px} \le 110\text{ px}$)
+- Mid High Route: $y = 480\text{ px}$ / $420\text{ px}$
+- Center Tier: $y = 360\text{ px}$ / $330\text{ px}$
+- Peak High Route: $y = 240\text{ px}$
+- Ceiling Walking Surface: $y = 130\text{ px}$
+- Headroom / Clearance: At least $105\text{ px}$ clearance above any walkable surface.
+
+--------------------------------------------------------------------------------
+2.3 ONE-WAY PLATFORM COLLISION LOGIC
+--------------------------------------------------------------------------------
+One-Way platforms use a custom processCallback in Phaser Arcade physics:
+```javascript
+this.physics.add.collider(this.player, this.oneWayPlatforms, null, (player, plat) => {
+    if (this.isDead) return false;
+    const pBody = player.body;
+    if (!this.isFlipped) {
+        // Player is upright: only collide when falling downward and feet were previously above slab
+        const prevBottom = pBody.prev.y + pBody.height;
+        return (pBody.velocity.y >= 0 && prevBottom <= plat.walkTop + 16);
+    } else {
+        // Player is upside-down: only collide when falling upward towards ceiling slab
+        const prevTop = pBody.prev.y;
+        return (prevTop >= plat.walkTop - 20);
+    }
+}, this);
+```
+Benefits:
+- Player can jump from underneath and pass straight through without bumping their head.
+- Downward descent cleanly catches the platform surface.
+- Moving between tiered platforms feels identical to classic precision platformers like Celeste.
+
+--------------------------------------------------------------------------------
+2.4 HAZARD SYSTEMS & TELEGRAPHING
+--------------------------------------------------------------------------------
+1. PATROL SAWS (`patrolSaw`):
+   - Circular hitbox with radius $r = 36-40\text{ px}$, concentric with blade texture.
+   - Sinusoidal or linear horizontal patrol back and forth with smooth turnarounds.
+   - Rotates continuously at 3 deg/frame.
+2. SWINGING CHAIN SAWS (`swingSaw`):
+   - Anchored to ceiling via metal mounting bracket at $(x_{pivot}, y_{pivot})$.
+   - Chain links rendered with procedural circular links along vector.
+   - Blade position driven by harmonic pendulum physics:
+     $\theta(t) = \theta_{max} \times \sin\left(\frac{2\pi t}{T}\right)$
+     $x = x_{pivot} + L \sin(\theta), \quad y = y_{pivot} + L \cos(\theta)$
+3. SPIKES (`spikes`):
+   - Floor spike strips ($y = 600$, height $45\text{ px}$) or Ceiling spike strips ($y = 130$, pointing down).
+   - Grouped with clear landing zones between strips (e.g. Twin Strips).
+4. SLIDING SPIKES (`slideSpike`):
+   - Retracted by default (alpha 0.25).
+   - Audio warning cue + orange flash shake ($280\text{ ms}$) prior to extending.
+   - Extends outward with Back.easeOut, stays lethal for active duration, then retracts.
+5. FALLING PLATFORMS (`fallingPlatform`):
+   - Metal platform that shakes for $500\text{ ms}$ with orange telegraph tint when stood on, then drops into abyss.
+   - Respawns automatically upon checkpoint reload.
+6. FALLING STALACTITE TRAPS (`decor_stalactite` with `trap: true`):
+   - Ceiling stalactite decor with proximity trigger ($|x - x_{trigger}| < radius$).
+   - Plays audio warning, emits ceiling dust particles, shakes for $280\text{ ms}$, then falls with quadratic acceleration ($g \approx 1400$).
+   - Shatters upon hitting floor or platform.
+
+--------------------------------------------------------------------------------
+2.5 PROCEDURAL SOUND SYNTHESIS (`soundManager`)
+--------------------------------------------------------------------------------
+Built entirely on Web Audio API (`AudioContext`). No sound files required:
+- Jump: Sine wave frequency sweep from $180\text{ Hz}$ to $340\text{ Hz}$ ($0.12\text{ s}$).
+- Land: Low-pass filtered noise burst ($80\text{ Hz}$, $0.06\text{ s}$).
+- Bounce Pad: Spring-like upward pitch bend $150\text{ Hz} \to 520\text{ Hz}$ ($0.25\text{ s}$).
+- Gravity Flip: Resonant dual-oscillator sci-fi shimmer ($240\text{ Hz} \to 620\text{ Hz}$ or reverse).
+- Warning: Double-beep warning tone ($880\text{ Hz} \to 1050\text{ Hz}$).
+- Checkpoint: Ascending arpeggio ($C_5 - E_5 - G_5$, triangle wave).
+- Goal: Victory fanfaric chord progression ($C - G - C$).
+- Death: Distorted noise burst with downward pitch drop ($220\text{ Hz} \to 50\text{ Hz}$).
+
+================================================================================
+SECTION 3: LEVEL-BY-LEVEL BLUEPRINT & ARCHITECTURE
+================================================================================
+
+--------------------------------------------------------------------------------
+LEVEL 1: CAVERN CROSSING (Width: 3600 px)
+--------------------------------------------------------------------------------
+- Theme: Classic cave tutorial & fundamental controls.
+- Base Ground: Continuous base ground ($y = 600$) with a small pit at $x = 1800\text{ px}$ ($w = 120\text{ px}$).
+- Hazards:
+  - 1 gentle floor spike strip ($w = 60\text{ px}$).
+  - 1 slow patrol saw ($d = 140\text{ px}$).
+- Platforms: 2 optional small high-route platforms at $y = 510\text{ px}$.
+- Checkpoint: $x = 1600\text{ px}$.
+- Goal: $x = 3450\text{ px}$.
+
+--------------------------------------------------------------------------------
+LEVEL 2: HIGH RISE (Width: 4200 px)
+--------------------------------------------------------------------------------
+- Theme: Verticality & tiered floating platforms.
+- Route: Introduction of multi-tiered high routes bypassing floor hazards.
+- Platforms:
+  - Stepping platforms: $y = 510 \to 420 \to 330\text{ px}$.
+  - One-way platforms allow climbing up and jumping across safely.
+- Hazards: 2 patrol saws patrolling underneath high routes.
+- Checkpoints: $x = 1850\text{ px}$.
+- Goal: $x = 4050\text{ px}$.
+
+--------------------------------------------------------------------------------
+LEVEL 3: PRECISION PITS (Width: 4800 px)
+--------------------------------------------------------------------------------
+- Theme: Pits, timing, and falling platforms.
+- Pits: Two pits ($x = 1400, w = 180\text{ px}$; $x = 2800, w = 220\text{ px}$).
+- Mechanics:
+  - Falling platforms bridging the first pit.
+  - Slide spike timing trap before the second pit.
+- Checkpoint: $x = 2200\text{ px}$.
+- Goal: $x = 4650\text{ px}$.
+
+--------------------------------------------------------------------------------
+LEVEL 4: THE GAUNTLET (Width: 5300 px)
+--------------------------------------------------------------------------------
+- Theme: Pillar Mountain & Air Bypasses.
+- Geometry:
+  - 5-step solid pillar mountain: PL1 ($y = 510$) $\to$ PL2 ($y = 420$) $\to$ PL3 ($y = 330$, peak) $\to$ PL4 ($y = 420$) $\to$ PL5 ($y = 510$).
+  - Overlap: 2px touch between pillars, step height 90px ($\le 110$ safe limit).
+- Hazards: Fast patrol saws on floor, bypassed via one-way air bypass platforms at $y = 420$.
+- Checkpoint: $x = 2250\text{ px}$.
+- Goal: $x = 5150\text{ px}$.
+
+--------------------------------------------------------------------------------
+LEVEL 5: PENDULUM DEPTHS (Width: 5400 px)
+--------------------------------------------------------------------------------
+- Theme: Swinging chain saws & harmonic timing.
+- Mechanics: 3 swinging saws with chain link rendering anchored to ceiling.
+- Platforms: High route tiered stepping stones timed with pendulum swing arcs.
+- Checkpoints: $x = 1600, 3200\text{ px}$.
+- Goal: $x = 5250\text{ px}$.
+
+--------------------------------------------------------------------------------
+LEVEL 6: BOUNCE FACTORY (Width: 5900 px)
+--------------------------------------------------------------------------------
+- Theme: Bounce pads & vertical launch mechanics.
+- Bounce Pads:
+  - BP1 ($x = 1535$): Launches player straight up to high route tier.
+  - BP2 ($x = 2900$): High-velocity pad launch assisting player over wide chasm ($w = 260\text{ px}$).
+- Hazards: Patrol saws with synchronized timing.
+- Checkpoint: $x = 2500\text{ px}$.
+- Goal: $x = 5750\text{ px}$.
+
+--------------------------------------------------------------------------------
+LEVEL 7: THE INVERSION CORE (Width: 6100 px)
+--------------------------------------------------------------------------------
+- Theme: Gravity Inversion & Ceiling Running.
+- Geometry:
+  - Flip Zone: $x = 2300$ to $3300\text{ px}$.
+  - Ceiling Slab: Spans $x = 2280$ to $3320\text{ px}$ at $y = 130\text{ px}$.
+  - Floor Spike Field: Floor spikes span $x = 2700$ to $3180\text{ px}$ ($480\text{ px}$ wide).
+- Solution: Player presses F / FLIP to run along the ceiling at $y = 130$ safely over the floor spike field.
+- Checkpoint: $x = 1240\text{ px}$.
+- Goal: $x = 5780\text{ px}$.
+
+--------------------------------------------------------------------------------
+LEVEL 8: CEILING RUNNER (Width: 7400 px)
+--------------------------------------------------------------------------------
+- Theme: Twin Strips, Dynamic Stalactite Traps & Dual Pit-Crossing Routes.
+- Hazard Group 1 (Twin Strips):
+  - Strip S1a: $x = 800$ to $870\text{ px}$.
+  - Safe Landing Zone: $x = 870$ to $1030\text{ px}$ ($160\text{ px}$ flat ground).
+  - Strip S1b: $x = 1030$ to $1100\text{ px}$.
+- Section 1 Pit Crossing ($x = 2650$ to $3550\text{ px}$, width $900\text{ px}$):
+  - DUAL CROSSING DESIGN:
+    1. Floor Jump Route: 3 crystal floating islands with solid bodies (`zone1_ceil_float` with `ceiling: false`, `flipY: true`, `oneWay: false`):
+       - Island 1: $x = 2740..2980$, $y = 510\text{ px}$ (gap: 90px, step-up: 90px from ground 600).
+       - Island 2: $x = 3060..3300$, $y = 480\text{ px}$ (gap: 80px, step-up: 30px).
+       - Island 3: $x = 3380..3600$, $y = 510\text{ px}$ (gap: 80px, step-down: 30px, overlaps ground 2 at 3550).
+       - Solid colliders guarantee player firmly stops and stands on top without falling through.
+    2. Upper Section / Ceiling Route (Restored Upper Floating Platforms):
+       - C1: $x = 2030$ to $2670\text{ px}$ at $y = 130\text{ px}$.
+       - Upper Island 1: $x = 2720\text{ px}$, $y = 220\text{ px}$, $w = 256\text{ px}$.
+       - Upper Island 2: $x = 3040\text{ px}$, $y = 280\text{ px}$, $w = 256\text{ px}$.
+       - Upper Island 3: $x = 3360\text{ px}$, $y = 220\text{ px}$, $w = 256\text{ px}$.
+       - C2: $x = 3668$ to $4178\text{ px}$ at $y = 130\text{ px}$.
+       - Allows acrobatic ceiling traversal and gravity flip bypass over the pit.
+- Section 2 Patrol Saw Bypass:
+  - Flip Zone 2: $x = 4950$ to $5850\text{ px}$.
+  - Ceiling Slab C3: $x = 4930$ to $5870\text{ px}$ at $y = 130\text{ px}$.
+  - Allows bypassing floor patrol saw B on the ceiling.
+- Dynamic Stalactites: Dynamic proximity falling traps at $x = 1800, 4400, 6100\text{ px}$.
+- Checkpoint: $x = 2300\text{ px}$.
+- Goal: $x = 7200\text{ px}$.
+
+================================================================================
+SECTION 4: EXTENSION GUIDELINES & GOLDEN RULES FOR FUTURE AGENTS
+================================================================================
+1. NEVER change `PLAYER.GRAVITY` (1500) or `PLAYER.JUMP_VELOCITY` (-690) without recalculating all level gaps.
+2. NEVER place a floor pit without checking that either a ceiling route OR floating platforms exist with step-ups $\le 110\text{ px}$ and gaps $\le 145\text{ px}$.
+3. ALWAYS keep ceiling walking surfaces at $y = 130\text{ px}$ so the UI/HUD bar is never obscured.
+4. ALWAYS keep base ground at $y = 600\text{ px}$.
+5. ALWAYS preserve `drawDebug = false` and ensure Arcade physics wireframes remain disabled.
+6. When adding new levels, append to `GAME_LEVELS` in `levels.js` and update the level count in `index.html` overlay buttons.
+7. ALWAYS bump the cache buster query parameter in `index.html` (`assets.js?v=...`, `levels.js?v=...`, `game.js?v=...`) after making changes so browsers load the updated scripts immediately.
+================================================================================
