@@ -2325,9 +2325,9 @@ class GameScene extends Phaser.Scene {
                 const fillRight = isWorldRight ? walkRight : (walkRight - 14);
                 const fillW = Math.max(0, fillRight - fillLeft);
                 const fillCenterX = fillLeft + fillW / 2;
-                const fillH = 720 - (walkTop + 24);
+                const fillH = 720 - walkTop; // Fill from walkTop, no gap under ground tile asset
                 if (fillH > 0 && fillW > 0) {
-                    const rockFill = this.add.rectangle(fillCenterX, (walkTop + 24) + fillH / 2, fillW, fillH, 0x141024);
+                    const rockFill = this.add.rectangle(fillCenterX, walkTop + fillH / 2, fillW, fillH, 0x141024);
                     rockFill.setDepth(2);
                     this.platformVisualsGroup.add(rockFill);
                 }
@@ -2397,9 +2397,21 @@ class GameScene extends Phaser.Scene {
 
                 const isOneWay = p.oneWay !== undefined ? p.oneWay : (meta.oneWay !== false);
 
-                if (isOneWay) {
-                    // One-Way Platform: Standable top 24px slab, jump-through from below so it never blocks ground route below!
-                    const slabY = isCeil ? (walkTop - 12) : (walkTop + 12);
+                if (isOneWay && !isCeil) {
+                    // Solid from ALL sides: player cannot jump through or pass through the platform
+                    const solidH = Math.min(dispH, meta.designThickness || 56);
+                    const colY = walkTop + solidH / 2;
+                    const solidSlab = this.solidPlatforms.create(centerX, colY, 'dummy_col');
+                    solidSlab.setVisible(false);
+                    solidSlab.setDisplaySize(w, solidH);
+                    solidSlab.refreshBody();
+                    solidSlab.walkTop = walkTop;
+                    solidSlab.walkLeft = walkLeft;
+                    solidSlab.walkRight = walkRight;
+                    solidSlab.isCeiling = false;
+                } else if (isOneWay && isCeil) {
+                    // Ceiling one-way slab (blocks only from below when flipped)
+                    const slabY = walkTop - 12;
                     const oneWaySlab = this.oneWayPlatforms.create(centerX, slabY, 'dummy_col');
                     oneWaySlab.setVisible(false);
                     oneWaySlab.setDisplaySize(w, 24);
@@ -2407,18 +2419,11 @@ class GameScene extends Phaser.Scene {
                     oneWaySlab.walkTop = walkTop;
                     oneWaySlab.walkLeft = walkLeft;
                     oneWaySlab.walkRight = walkRight;
-                    oneWaySlab.isCeiling = isCeil;
-                    if (!isCeil) {
-                        oneWaySlab.body.checkCollision.down = false;
-                        oneWaySlab.body.checkCollision.left = false;
-                        oneWaySlab.body.checkCollision.right = false;
-                        oneWaySlab.body.checkCollision.up = true;
-                    } else {
-                        oneWaySlab.body.checkCollision.up = false;
-                        oneWaySlab.body.checkCollision.left = false;
-                        oneWaySlab.body.checkCollision.right = false;
-                        oneWaySlab.body.checkCollision.down = true;
-                    }
+                    oneWaySlab.isCeiling = true;
+                    oneWaySlab.body.checkCollision.up = false;
+                    oneWaySlab.body.checkCollision.left = false;
+                    oneWaySlab.body.checkCollision.right = false;
+                    oneWaySlab.body.checkCollision.down = true;
                 } else {
                     // Full solid collider: player hits head from below and cannot cross
                     const solidH = Math.min(dispH, meta.designThickness || 56);
@@ -2441,23 +2446,8 @@ class GameScene extends Phaser.Scene {
                 const tex = meta ? meta.texture : (isPillar ? 'zone1_pillar' : 'zone1_wall');
                 const baseFlipX = p.flipX !== undefined ? p.flipX : false;
 
-                if (isPillar && totalH > 240) {
-                    // Vertical 3-slice pillar: top cap on top, middle body section below (alternating flipX, 2px overlap)
-                    const capH = Math.min(130, Math.round(totalH * 0.45));
-                    const bodyH = totalH - capH + 2;
-
-                    const topCap = this.add.image(centerX, walkTop + capH / 2, tex);
-                    topCap.setDisplaySize(dispW, capH);
-                    topCap.setDepth(4);
-                    topCap.setFlipX(baseFlipX);
-                    this.platformVisualsGroup.add(topCap);
-
-                    const body = this.add.image(centerX, (walkTop + capH - 2) + bodyH / 2, tex);
-                    body.setDisplaySize(dispW, bodyH);
-                    body.setDepth(4);
-                    body.setFlipX(!baseFlipX);
-                    this.platformVisualsGroup.add(body);
-                } else {
+                {
+                    // Render pillar as a single image spanning full height (no seam/gap between two stacked pieces)
                     const sprite = this.add.image(centerX, walkTop + (720 - walkTop + 3) / 2, tex);
                     sprite.setDisplaySize(dispW, 720 - walkTop + 3);
                     sprite.setDepth(4);
