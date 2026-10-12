@@ -2109,9 +2109,11 @@ class GameScene extends Phaser.Scene {
                 let sy = s.y;
                 const isCeil = (s.side === 'ceiling' || sy < 300);
                 if (isCeil) {
-                    sy = 130 + s.height / 2;
+                    // Sink ceiling spikes up by 6px so base is flush with ceiling surface
+                    sy = 130 + s.height / 2 - 6;
                 } else {
-                    sy = GROUND_TOP_Y - s.height / 2;
+                    // Sink floor spikes down by 6px so base is flush with ground surface (removes gap from asset transparent padding)
+                    sy = GROUND_TOP_Y - s.height / 2 + 6;
                 }
 
                 const spike = this.spikes.create(s.x, sy, 'spikes');
