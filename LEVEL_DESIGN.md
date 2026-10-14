@@ -161,35 +161,35 @@ Every level must strictly obey these deterministic constraints to guarantee sati
 | Level | Level Name / Theme | Width ($px$) | Hazard Count | Max Gap % | Max Gap ($px$) | Checkpoints | Flip Sections | Role / Pacing |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
 | **L1** | Crystal Cavern (Tutorial) | 3500 | 3 | 40% | 58 px | 0 | 0 | Intro, basic running & jumping |
-| **L2** | Ancient Slabs | 4450 | 5 | 42% | 61 px | 0 | 0 | Small platform steps |
+| **L2** | Ancient Slabs | 4450 | 5 | 42% | 61 px | 1 | 0 | Small platform steps |
 | **L3** | Pillar Steps | 4700 | 5 | 45% | 65 px | 1 | 0 | High route introduction |
 | **L4** | Spike Valley | 5300 | 7 | 47% | 68 px | 1 | 0 | Static spike navigation |
-| **L5** | **Mossy Respite** *(Breather)* | 5200 | 5 | 45% | 65 px | 1 | 0 | **Breather:** Wide platforms, scenic pacing |
-| **L6** | Moving Machinery | 6000 | 8 | 52% | 75 px | 1 | 0 | Moving platforms & pits |
-| **L7** | The Inversion Core | 6100 | 8 | 54% | 78 px | 1 | 1 | Gravity flip introduction |
-| **L8** | Ceiling Runner | 7400 | 7 | 56% | 81 px | 1 | 2 | Twin flip corridors |
-| **L9** | Sawblade Alley | 4600 | 10 | 58% | 84 px | 2 | 1 | Patrol saws introduced |
-| **L10** | **The Crucible** *(Gauntlet)* | 5200 | 14 | 62% | 90 px | 3 | 2 | **Gauntlet 1:** Zone 1 climax challenge |
-| **L11** | Whispering Heights | 4800 | 10 | 62% | 90 px | 2 | 1 | Higher platform tiers (330/240) |
-| **L12** | Pendulum Pass | 4900 | 11 | 64% | 93 px | 2 | 0 | Swinging saws timing |
-| **L13** | Falling Rubble | 5100 | 12 | 66% | 96 px | 2 | 0 | Collapsing platforms introduced |
-| **L14** | Dual Flip Chamber | 5200 | 12 | 68% | 99 px | 2 | 2 | Flip inversion with hazards |
-| **L15** | **Highland Sanctuary** *(Breather)*| 5000 | 10 | 62% | 90 px | 2 | 1 | **Breather:** Open layout, generous recovery |
-| **L16** | Springboard Spire | 5400 | 13 | 72% | 104 px | 2 | 1 | Bounce pads chain jumps |
-| **L17** | The Conveyor Trench | 5500 | 14 | 74% | 107 px | 2 | 0 | Conveyor belt momentum shifts |
-| **L18** | Crusher Alley | 5700 | 14 | 76% | 110 px | 2 | 0 | Timed stompers introduced |
-| **L19** | Inverted Descent | 5800 | 15 | 78% | 113 px | 2 | 1 | Ceiling drop to floor transition |
-| **L20** | **The Labyrinth** *(Gauntlet)* | 6500 | 18 | 82% | 119 px | 3 | 3 | **Gauntlet 2:** Zone 2 climax trial |
-| **L21** | Needle Ridge | 6000 | 15 | 80% | 116 px | 2 | 0 | Precision spike hopping |
-| **L22** | Triple Inversion | 6200 | 16 | 82% | 119 px | 2 | 3 | Dynamic multi-zone flipping |
-| **L23** | Turret Bastion | 6300 | 16 | 84% | 122 px | 2 | 1 | Turret projectiles & moving covers |
-| **L24** | The Clockwork Descent | 6500 | 17 | 86% | 125 px | 3 | 2 | Fast pendulum + moving platforms |
-| **L25** | **Skyline Terrace** *(Breather)* | 6300 | 14 | 80% | 116 px | 3 | 1 | **Breather:** Flow-state platforming |
-| **L26** | Fracture Chasm | 6800 | 18 | 88% | 128 px | 3 | 3 | Complex falling platform chains |
-| **L27** | Rising Fury | 6900 | 19 | 90% | 131 px | 3 | 1 | Rising spike waves + bounce pads |
-| **L28** | The Abyss Run | 7100 | 20 | 92% | 133 px | 3 | 3 | Long gaps + multi-flip routing |
-| **L29** | Storm of Blades | 7300 | 21 | 95% | 138 px | 3 | 3 | Multi-hazard jump windows (up to 2) |
-| **L30** | **The Grand Finale** *(Gauntlet)* | 8000 | 24 | 95% | 138 px | 4 | 4 | **Master Gauntlet:** Ultimate mastery test |
+| **L5** | **Mossy Respite** *(Breather)* | 5200 | 5 | 45% | 65 px | 2 | 0 | **Breather:** Wide platforms, scenic pacing |
+| **L6** | Moving Machinery | 6000 | 8 | 52% | 75 px | 2 | 0 | Moving platforms & pits |
+| **L7** | The Inversion Core | 6100 | 8 | 54% | 78 px | 2 | 1 | Gravity flip introduction |
+| **L8** | Ceiling Runner | 7400 | 7 | 56% | 81 px | 3 | 2 | Twin flip corridors |
+| **L9** | Sawblade Alley | 4600 | 10 | 58% | 84 px | 3 | 1 | Patrol saws introduced |
+| **L10** | **The Crucible** *(Gauntlet)* | 5200 | 14 | 62% | 90 px | 4 | 2 | **Gauntlet 1:** Zone 1 climax challenge |
+| **L11** | Whispering Heights | 4800 | 10 | 62% | 90 px | 4 | 1 | Higher platform tiers (330/240) |
+| **L12** | Pendulum Pass | 4900 | 11 | 64% | 93 px | 4 | 0 | Swinging saws timing |
+| **L13** | Falling Rubble | 5100 | 12 | 66% | 96 px | 4 | 0 | Collapsing platforms introduced |
+| **L14** | Dual Flip Chamber | 5200 | 12 | 68% | 99 px | 5 | 2 | Flip inversion with hazards |
+| **L15** | **Highland Sanctuary** *(Breather)*| 5000 | 10 | 62% | 90 px | 5 | 1 | **Breather:** Open layout, generous recovery |
+| **L16** | Springboard Spire | 5400 | 13 | 72% | 104 px | 5 | 1 | Bounce pads chain jumps |
+| **L17** | The Conveyor Trench | 5500 | 14 | 74% | 107 px | 6 | 0 | Conveyor belt momentum shifts |
+| **L18** | Crusher Alley | 5700 | 14 | 76% | 110 px | 6 | 0 | Timed stompers introduced |
+| **L19** | Inverted Descent | 5800 | 15 | 78% | 113 px | 6 | 1 | Ceiling drop to floor transition |
+| **L20** | **The Labyrinth** *(Gauntlet)* | 6500 | 18 | 82% | 119 px | 8 | 3 | **Gauntlet 2:** Zone 2 climax trial |
+| **L21** | Needle Ridge | 6000 | 15 | 80% | 116 px | 8 | 0 | Precision spike hopping |
+| **L22** | Triple Inversion | 6200 | 16 | 82% | 119 px | 8 | 3 | Dynamic multi-zone flipping |
+| **L23** | Turret Bastion | 6300 | 16 | 84% | 122 px | 8 | 1 | Turret projectiles & moving covers |
+| **L24** | The Clockwork Descent | 6500 | 17 | 86% | 125 px | 8 | 2 | Fast pendulum + moving platforms |
+| **L25** | **Skyline Terrace** *(Breather)* | 6300 | 14 | 80% | 116 px | 8 | 1 | **Breather:** Flow-state platforming |
+| **L26** | Fracture Chasm | 6800 | 18 | 88% | 128 px | 9 | 3 | Complex falling platform chains |
+| **L27** | Rising Fury | 6900 | 19 | 90% | 131 px | 9 | 1 | Rising spike waves + bounce pads |
+| **L28** | The Abyss Run | 7100 | 20 | 92% | 133 px | 9 | 3 | Long gaps + multi-flip routing |
+| **L29** | Storm of Blades | 7300 | 21 | 95% | 138 px | 10 | 3 | Multi-hazard jump windows (up to 2) |
+| **L30** | **The Grand Finale** *(Gauntlet)* | 8000 | 24 | 95% | 138 px | 11 | 4 | **Master Gauntlet:** Ultimate mastery test |
 
 Widths in this table are minimums; a level may be longer when its design needs it.
 
@@ -393,3 +393,56 @@ To make every level feel distinct immediately:
      - Left boundary is solid (invisible wall at $x \le 0$).
 3. **Validator Audit:**
    - Validator classifies and reports the opening signature of every level in self-test reports.
+
+---
+
+## 11. CHECKPOINT RULES
+
+### Count
+
+Use the checkpoint counts from the **30-Level Master Progression Table** (Section 4) — spawn point is never counted as a checkpoint. The count for any level is at least as large as the count for the level before it, with one exception: a **breather level** (5, 15, 25) may keep the same count as the level before it rather than raising it.
+
+### Placement
+
+1. **Surface requirement:** Every checkpoint flag stands on flat, solid ground inside a **rest area** that follows a completed hazard group. It must never be placed between two hazards that belong to the same group.
+
+2. **Clearance margins:** At least **150 px** of flat, hazard-free ground on both sides of the flag. At least **150 px** from any pit edge, platform edge, step-up or step-down, or hazard (saw patrol extent, spike strip, crusher reach, turret range, etc.).
+
+3. **Mandatory-section coverage:** Every section listed below must have a checkpoint (or the level spawn point) within **400 px** before its entry edge:
+   - Any pit (open or pad-assisted).
+   - Any falling-platform chain.
+   - Any ceiling route or flip section (`flipZone`).
+   - Any gauntlet zone (multi-hazard dense sequence).
+
+4. **Even distribution:** No gap between two consecutive checkpoints (or between spawn and first checkpoint, or between last checkpoint and goal) may exceed **1.6 × the average spacing** for that level, unless the level has fewer than 3 checkpoints total. Average spacing = (level width) ÷ (checkpoint count + 1).
+
+### Behavior
+
+- **Activation:** Touching the flag sprite activates it. The flag turns bright (full-alpha tint) with a small pop visual (brief scale pulse) and plays a soft sound if a sound channel is available. A flag that is already active does not play the sound or pulse again.
+- **Respawn:** Dying respawns the player standing exactly on the ground at the last activated flag — feet exactly on the walkable top surface, zero velocity in both axes, gravity reset to normal floor-down direction — or at the level spawn point if no flag is active.
+- **Full state reset on respawn:** Every falling platform resets to its original resting position. Every moving hazard (patrol saw, swinging saw, crusher, turret) resets to its initial phase/position. Every timed hazard timer and every flip state and cooldown resets to its default value. The player reappears with full control immediately (no invincibility frame required by design, but one may be added for feel).
+- **Persistence within an attempt:** Once activated, a flag stays active for the entire level attempt. Activating a later flag does not deactivate earlier ones; only the most-recently-activated flag is used as the respawn point.
+- **Reset on exit:** Restarting the level or leaving it (e.g., returning to the level select screen) resets all flags to inactive. The respawn point reverts to the spawn.
+
+### Validator Checks (report only — never auto-modifies levels)
+
+The validator runs the following checkpoint checks for every built level and prints a **checkpoint table** to the console for each level:
+
+| Column | Content |
+| :--- | :--- |
+| Level | Level ID and name |
+| Count | Number of checkpoints (excluding spawn) |
+| X Positions | Sorted list of checkpoint X coordinates |
+| Gaps | Gap between spawn→CP1, CP1→CP2 … CPn→Goal (in px) |
+| Max Gap | The single largest gap value |
+| Avg Spacing | (world width) ÷ (checkpoint count + 1) |
+| Max/Avg Ratio | Max Gap ÷ Avg Spacing (must be ≤ 1.6 for levels with ≥ 3 CPs) |
+
+Warnings printed (never auto-fixed) when any of the following is violated:
+
+1. The checkpoint count does not match the target from the table.
+2. The count decreases from the previous level (unless the current level is a breather and the count is equal).
+3. Any checkpoint is fewer than 150 px from a pit edge, platform edge, step, or hazard.
+4. Any checkpoint is fewer than 150 px from flat-ground start or end (not enough run-up / run-out).
+5. A mandatory section (pit, pad-assisted pit, falling-platform chain, flip zone, gauntlet) has no checkpoint or spawn within 400 px before it.
+6. Any consecutive gap exceeds 1.6 × average spacing (for levels with ≥ 3 checkpoints).

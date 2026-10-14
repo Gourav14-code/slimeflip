@@ -136,7 +136,10 @@ var GAME_LEVELS = [
         bgTint: 0xffffff,
         playerStart: { x: 140, y: 568 },
 
-        checkpoints: [],
+        checkpoints: [
+            // Section 7: Checkpoint flag at x: 2150 (rest area between S3 and pit)
+            { id: 'cp_l2_a', x: 2150, y: 600 }
+        ],
 
         zones: [],
 
@@ -228,6 +231,7 @@ var GAME_LEVELS = [
         hints: [
             { triggerX: 100,  text: 'Level 2: Ancient Slabs! Master the platform stairs and floor hazards.' },
             { triggerX: 920,  text: 'Take the high stairs over the spike beds, or jump through on the ground!' },
+            { triggerX: 2050, text: '🚩 CHECKPOINT SAVED!' },
             { triggerX: 2360, text: '⚠️ CHASM PIT: Clear the open chasm to reach the other side!' },
             { triggerX: 2780, text: '⚠️ PATROL SAW: Time your leap cleanly across the rolling blade!' },
             { triggerX: 3220, text: 'Take the upper stone route over the second saw, or jump below!' }
@@ -510,7 +514,8 @@ var GAME_LEVELS = [
         playerStart: { x: 140, y: 568 },
 
         checkpoints: [
-            { id: 'cp_mid5', x: 1750, y: 600 }
+            { id: 'cp_mid5', x: 1750, y: 600 },
+            { id: 'cp_l5_b', x: 3610, y: 600 }
         ],
 
         zones: [],
@@ -610,6 +615,7 @@ var GAME_LEVELS = [
             { triggerX: 800,  text: 'Jump cleanly over the mossy stone hurdle.' },
             { triggerX: 1650, text: '🚩 CHECKPOINT SAVED!' },
             { triggerX: 2100, text: '🌿 WIDE ISLANDS: Leap across the stepping platforms over the chasm.' },
+            { triggerX: 3510, text: '🚩 CHECKPOINT SAVED!' },
             { triggerX: 3700, text: 'Clear the wide stone wall and final hazards ahead!' }
         ]
     },
@@ -627,7 +633,8 @@ var GAME_LEVELS = [
 
         checkpoints: [
             // Section 7: Checkpoint flag at x=2650 (at least 250px flat ground before and after)
-            { id: 'cp_mid6', x: 2650, y: 600 }
+            { id: 'cp_mid6', x: 2650, y: 600 },
+            { id: 'cp_l6_b', x: 4660, y: 600 }
         ],
 
         zones: [],
@@ -754,6 +761,7 @@ var GAME_LEVELS = [
             { triggerX: 1420, text: '⬆ BOUNCE PAD: Step on the pad to launch straight up to the high route!' },
             { triggerX: 2500, text: '🚩 CHECKPOINT SAVED!' },
             { triggerX: 2850, text: '⚠️ PAD-ASSISTED CHASM: Launch from the pad and hold RIGHT to clear the pit!' },
+            { triggerX: 4560, text: '🚩 CHECKPOINT SAVED!' },
             { triggerX: 4700, text: 'Watch the rapid saw patrol timing and sprint through cleanly!' }
         ]
     },
@@ -771,7 +779,9 @@ var GAME_LEVELS = [
 
         checkpoints: [
             // Section 4: Checkpoint flag at x=1240 (at least 250px flat ground before and after)
-            { id: 'cp_mid7', x: 1240, y: 600 }
+            { id: 'cp_mid7', x: 1240, y: 600 },
+            // Section 6: Checkpoint flag at x=2050 (rest area before Flip Zone)
+            { id: 'cp_l7_b', x: 2050, y: 600 }
         ],
 
         zones: [
@@ -894,6 +904,7 @@ var GAME_LEVELS = [
             { triggerX: 100,  text: 'Level 7: The Inversion Core! Master gravity flipping to walk on the ceiling!' },
             { triggerX: 1150, text: '🚩 CHECKPOINT SAVED!' },
             { triggerX: 1420, text: '⚠️ PAD-ASSISTED CHASM: Launch from the pad and hold RIGHT to clear the pit!' },
+            { triggerX: 1950, text: '🚩 CHECKPOINT SAVED!' },
             { triggerX: 2200, text: '⬆ FLIP ZONE AHEAD: Press F or tap FLIP to invert gravity and cross the spike field!' },
             { triggerX: 3700, text: 'Timing is everything! Clear the remaining patrol saws with precision!' }
         ]
@@ -911,7 +922,9 @@ var GAME_LEVELS = [
         playerStart: { x: 140, y: 568 }, // Standard visible floor spawn
 
         checkpoints: [
-            { id: 'cp_l8_mid', x: 2300, y: 600 } // Checkpoint 1 before Flip Section 1 & Pit
+            { id: 'cp_l8_mid', x: 2300, y: 600 }, // Checkpoint 1 before Flip Section 1 & Pit
+            { id: 'cp_l8_b',   x: 4800, y: 600 }, // Checkpoint 2 before Flip Section 2
+            { id: 'cp_l8_c',   x: 6050, y: 600 }  // Checkpoint 3 after Flip Section 2 before final gauntlet
         ],
 
         zones: [
@@ -1025,10 +1038,12 @@ var GAME_LEVELS = [
         hints: [
             { triggerX: 100,  text: 'Level 8: Ceiling Runner! Enter the cavern and master twin inversions!' },
             { triggerX: 720,  text: '⚠️ TWIN SPIKES: Precision jump into the landing zone between the strips!' },
-            { triggerX: 1950, text: '🚩 CHECKPOINT SAVED!' },
+            { triggerX: 1950, text: '🚩 CHECKPOINT 1 SAVED!' },
             { triggerX: 2020, text: '⬆ GRAVITY FLIP & PIT CROSSING: Invert gravity with F/FLIP to run the ceiling, or leap across the crystal islands!' },
             { triggerX: 4300, text: 'Superb balance! Watch your footing and prepare for the next inversion!' },
-            { triggerX: 4900, text: '⬆ INVERT: Press F or tap FLIP to bypass patrol saw B along the ceiling!' }
+            { triggerX: 4700, text: '🚩 CHECKPOINT 2 SAVED!' },
+            { triggerX: 4900, text: '⬆ INVERT: Press F or tap FLIP to bypass patrol saw B along the ceiling!' },
+            { triggerX: 5950, text: '🚩 CHECKPOINT 3 SAVED!' }
         ]
     }
 ];

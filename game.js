@@ -554,6 +554,107 @@ function validateLevel(lvl) {
         });
     });
 
+    // 8. Checkpoint Clearance & Mandatory Section Rules (LEVEL_DESIGN.md Section 11)
+    const TARGET_CHECKPOINTS = { 1: 0, 2: 1, 3: 1, 4: 1, 5: 2, 6: 2, 7: 2, 8: 3 };
+    const targetCP = TARGET_CHECKPOINTS[lvl.id];
+    const levelCPs = (lvl.checkpoints || []).slice().sort((a, b) => a.x - b.x);
+
+    if (targetCP !== undefined && levelCPs.length !== targetCP) {
+        report.warnings.push(`Level ${lvl.id}: Checkpoint count (${levelCPs.length}) does not match target (${targetCP})!`);
+    }
+
+    const groundSlabs = (lvl.platforms || []).filter(p => p.type === 'ground');
+    const groundSteps = (lvl.platforms || []).filter(p => p.type !== 'ground' && (!p.ceiling && p.y >= 500));
+    const patrolSaws = (lvl.telegraphedHazards || []).filter(h => h.hazardType === 'saw' || h.type === 'patrolSaw');
+
+    levelCPs.forEach(cp => {
+        // Pit clearance (>= 150px)
+        (lvl.pits || []).forEach(pit => {
+            const pitStart = pit.x;
+            const pitEnd = pit.x + pit.w;
+            if (cp.x >= pitStart && cp.x <= pitEnd) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is inside pit [${pitStart}-${pitEnd}]!`);
+            } else if (Math.abs(cp.x - pitStart) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of pit start (${pitStart})!`);
+            } else if (Math.abs(cp.x - pitEnd) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of pit end (${pitEnd})!`);
+            }
+        });
+
+        // Spikes clearance (>= 150px)
+        (lvl.spikes || []).forEach(s => {
+            if (s.side === 'ceiling' || s.y < 300) return;
+            const sLeft = s.x - (s.width / 2);
+            const sRight = s.x + (s.width / 2);
+            if (cp.x >= sLeft && cp.x <= sRight) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is inside spike strip [${sLeft}-${sRight}]!`);
+            } else if (cp.x < sLeft && (sLeft - cp.x) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of spike strip at x:${sLeft}!`);
+            } else if (cp.x > sRight && (cp.x - sRight) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of spike strip at x:${sRight}!`);
+            }
+        });
+
+        // Patrol saws clearance (>= 150px)
+        patrolSaws.forEach(saw => {
+            const r = saw.radius || 40;
+            const sawLeft = saw.x - r;
+            const sawRight = saw.x + (saw.distance || 0) + r;
+            if (cp.x >= sawLeft && cp.x <= sawRight) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is inside saw patrol [${sawLeft}-${sawRight}]!`);
+            } else if (cp.x < sawLeft && (sawLeft - cp.x) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of saw danger at x:${sawLeft}!`);
+            } else if (cp.x > sawRight && (cp.x - sawRight) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of saw danger at x:${sawRight}!`);
+            }
+        });
+
+        // Step clearance (>= 150px)
+        groundSteps.forEach(step => {
+            const stepLeft = step.x;
+            const stepRight = step.x + (step.w || step.width || 100);
+            if (cp.x >= stepLeft && cp.x <= stepRight) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is on step [${stepLeft}-${stepRight}]!`);
+            } else if (cp.x < stepLeft && (stepLeft - cp.x) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of step at x:${stepLeft}!`);
+            } else if (cp.x > stepRight && (cp.x - stepRight) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of step at x:${stepRight}!`);
+            }
+        });
+
+        // Flat ground clearance (>= 150px)
+        const slab = groundSlabs.find(g => cp.x >= g.x && cp.x <= g.x + g.w);
+        if (!slab) {
+            report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is not on a solid ground slab!`);
+        } else {
+            if (slab.x > 0 && (cp.x - slab.x) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of ground slab start (${slab.x})!`);
+            }
+            if ((slab.x + slab.w) < lvl.worldWidth && ((slab.x + slab.w) - cp.x) < 150) {
+                report.warnings.push(`Level ${lvl.id}: Checkpoint at x:${cp.x} is within 150px of ground slab end (${slab.x + slab.w})!`);
+            }
+        }
+    });
+
+    // Mandatory section coverage (pit, flipZone) for levels requiring checkpoints (L2+)
+    if (lvl.id > 1) {
+        const spawnX = (lvl.playerStart && lvl.playerStart.x !== undefined) ? lvl.playerStart.x : 140;
+        (lvl.pits || []).forEach(pit => {
+            const hasCover = (spawnX <= pit.x && (pit.x - spawnX) <= 400) ||
+                levelCPs.some(cp => cp.x <= pit.x && (pit.x - cp.x) <= 400);
+            if (!hasCover) {
+                report.warnings.push(`Level ${lvl.id}: Mandatory pit at x:${pit.x} has no checkpoint or spawn within 400px before it!`);
+            }
+        });
+        (lvl.zones || []).filter(z => z.type === 'flipZone').forEach(fz => {
+            const hasCover = (spawnX <= fz.x && (fz.x - spawnX) <= 400) ||
+                levelCPs.some(cp => cp.x <= fz.x && (fz.x - cp.x) <= 400);
+            if (!hasCover) {
+                report.warnings.push(`Level ${lvl.id}: Mandatory flipZone at x:${fz.x} has no checkpoint or spawn within 400px before it!`);
+            }
+        });
+    }
+
     lvl._validationReport = report;
     return report;
 }
@@ -617,6 +718,34 @@ function runSelfTest() {
     if (console && console.table) {
         console.log('[Self-Test Opening Signatures Table (Levels 1-8)]:');
         console.table(openingSignatures);
+    }
+
+    // Checkpoint Progression & Spacing Table (Levels 1 to 8 - LEVEL_DESIGN.md Section 11)
+    const checkpointTable = [];
+    GAME_LEVELS.forEach(lvl => {
+        const cps = (lvl.checkpoints || []).slice().sort((a, b) => a.x - b.x);
+        const spawnX = (lvl.playerStart && lvl.playerStart.x !== undefined) ? lvl.playerStart.x : 140;
+        const goalX = (lvl.goal && lvl.goal.x !== undefined) ? lvl.goal.x : lvl.worldWidth;
+        const pts = [spawnX, ...cps.map(c => c.x), goalX];
+        const gaps = [];
+        for (let i = 0; i < pts.length - 1; i++) {
+            gaps.push(pts[i + 1] - pts[i]);
+        }
+        const maxGap = gaps.length > 0 ? Math.max(...gaps) : lvl.worldWidth;
+        const avgSpacing = lvl.worldWidth / (cps.length + 1);
+        checkpointTable.push({
+            Level: `L${lvl.id}: ${lvl.name.replace(/Level \d+:\s*/, '')}`,
+            Count: cps.length,
+            'X Positions': cps.length > 0 ? cps.map(c => c.x).join(', ') : 'None',
+            Gaps: gaps.join(' -> '),
+            'Max Gap': `${maxGap}px`,
+            'Avg Spacing': `${avgSpacing.toFixed(0)}px`,
+            'Max/Avg Ratio': (maxGap / avgSpacing).toFixed(2)
+        });
+    });
+    if (console && console.table) {
+        console.log('[Self-Test Checkpoint Progression Table (Levels 1-8)]:');
+        console.table(checkpointTable);
     }
 
     // Flip Trajectory Summary (Level 7)
