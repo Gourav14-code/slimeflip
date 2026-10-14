@@ -168,7 +168,7 @@ Every level must strictly obey these deterministic constraints to guarantee sati
 | **L6** | Moving Machinery | 6000 | 8 | 52% | 75 px | 2 | 0 | Moving platforms & pits |
 | **L7** | The Inversion Core | 6100 | 8 | 54% | 78 px | 2 | 1 | Gravity flip introduction |
 | **L8** | Ceiling Runner | 7400 | 7 | 56% | 81 px | 3 | 2 | Twin flip corridors |
-| **L9** | Sawblade Alley | 4600 | 10 | 58% | 84 px | 3 | 1 | Patrol saws introduced |
+| **L9** | Falling Sands / Sawblade Alley | 7300 | 10 | 58% | 84 px | 3 | 1 | Falling platform chains & patrol saws |
 | **L10** | **The Crucible** *(Gauntlet)* | 5200 | 14 | 62% | 90 px | 4 | 2 | **Gauntlet 1:** Zone 1 climax challenge |
 | **L11** | Whispering Heights | 4800 | 10 | 62% | 90 px | 4 | 1 | Higher platform tiers (330/240) |
 | **L12** | Pendulum Pass | 4900 | 11 | 64% | 93 px | 4 | 0 | Swinging saws timing |
@@ -374,29 +374,62 @@ These standing visual, layering, and spatial rules apply to every level in Slime
 
 ---
 
-## 10. OPENING UNIQUENESS (applies to every level)
+## 10. FALLING PLATFORM RULES
 
-To make every level feel distinct immediately:
-1. **Diverse Opening Signatures:**
-   - The first $600\text{ px}$ must use one of these distinct opening types:
-     - `flat_decor`: flat base ground with decor (Levels 1, 2, 3, 5).
-     - `stair_down`: ground begins high on a pillar/tier and steps down to base ground (Level 8).
-     - `early_hazard`: flat ground with an immediate warning hazard before $x = 400$ (Level 4).
-     - `pad_launch`: bounce pad right at the start launching player to an upper route (Level 6).
-     - `early_flip`: flip zone within the first $300\text{ px}$ (Level 7).
-     - `raised_ledge`: opening starts on an elevated ledge with safe drop-down.
-2. **Level 8 Opening Structure:**
-   - Uses `flat_decor`:
-     - Spawns on standard flat ground ($x = 140, y = 568$, feet at $y = 600$, fully visible and aligned with Levels 1-7).
-     - Continuous flat ground from $x = 0$ to $x = 2650$ decorated with ambient rocks.
-     - Leads cleanly into the Twin Spikes precision landing zone at $x = 800..1100$.
-     - Left boundary is solid (invisible wall at $x \le 0$).
-3. **Validator Audit:**
-   - Validator classifies and reports the opening signature of every level in self-test reports.
+1. **Asset & Surface Geometry:**
+   - **Asset Texture Key:** `falling_platform`, `dark_stone_cube`, `stone_cube` (`assets/zone1/falling_platform.png`), created from `C:\ug\assets\zone 1\dark stone cub.png`.
+   - **Supported Type Aliases in Level Definitions:** `fallingPlatform`, `stoneCube`, `darkStoneCube`.
+   - Native pixel dimensions: $512 \times 508\text{ px}$ (RGBA transparent background, glowing cyan cracks).
+   - Measured native walkable surface: `walkLeft: 0`, `walkRight: 512` (walkable width $= 512\text{ px}$), `walkTop: 0`.
+   - Displayed with a walkable width of about $110\text{ px}$ (never above $120\text{ px}$), scaled uniformly ($S = 110 / 512 \approx 0.215$, display size $\approx 110 \times 109\text{ px}$), never stretched.
+   - Planted at floating tiers: elevated above pit gaps at $y = 510, 420$ (elevated $90\text{ px}$ to $180\text{ px}$ above ground level $600$).
+
+2. **States & Physics Behavior:**
+   - **Collision Model:** 100% hard solid static body integrated into `solidPlatforms`.
+   - **4-Way Collision:** `left: true`, `right: true`, `up: true`, `down: true`. The player cannot pass through or phase through ("aar-paar nahi ho sakta") from any direction.
+   - **Landing & Standing:** When the player jumps onto the stone cube, downward velocity stops immediately, the player becomes grounded (`blocked.down = true`), and remains safely standing on top of the stone ("stone pr rukna hai"). The player never falls through into the pit.
+   - **Landing Feedback:** Subtle physical micro-thud animation ($2\text{ px}$) on landing for tactile feedback while physics body remains permanently active and solid.
+   - **Reset:** Automatically resets on player death, checkpoint respawn, and level restart.
+
+3. **Telegraphing & Visual Style:**
+   - Solid hard dark basalt stone cube with glowing cyan energy cracks matching Zone 1 aesthetics.
+
+4. **Collider:**
+   - Full cube solid collider ($w \times \text{solidH} = 110\text{ px} \times 109\text{ px}$) perfectly matching the visual sprite.
+   - The platform never damages the player. Pit death triggers ignore the player while grounded on the platform.
+
+5. **Chain & Pit Gap Rules:**
+   - Gaps between walkable edges must be between $65\text{ px}$ and $75\text{ px}$ (always larger than `PLAYER.HITBOX_WIDTH` $51\text{ px}$ so the player cleanly falls into the pit when missing a jump, while well below `SAFE_GAP` $145\text{ px}$).
+   - Tier steps must be at most $90\text{ px}$.
+   - The walkable width $W$ plus the gap to the next platform is at most $0.75 \times \text{MAX\_JUMP\_DISTANCE}$ ($0.75 \times 240 = 180\text{ px}$), enabling the player to leap comfortably across.
+   - The validator verifies every consecutive pair in the worst case (landing at the near edge, jumping at once while holding right, step up and step down, with a $15\%$ safety margin).
+   - A chain over a pit must be the only way across (the pit is wider than $\text{MAX\_JUMP\_DISTANCE} = 240\text{ px}$).
+   - A pit with floating stone cubes requires a checkpoint or spawn point within $400\text{ px}$ before the pit start, and at least $250\text{ px}$ of continuous flat, hazard-free ground after the pit.
+   - A single stone cube used as a teaching stone goes over an intro pit (about $240\text{ px}$, gaps of about $70\text{ px}$ on each side) with a spawn or checkpoint within $400\text{ px}$ before it and $250\text{ px}$ of flat safe ground after it.
+   - **Flip Zone UP Arrow (▲) Integration:** Inside any Flip Zone on the floor, pressing the UP arrow (▲) button or UP/W/Space keys directly triggers a gravity flip to the ceiling to cleanly scale large obstacles. Once the obstacle is cleared and the ceiling corridor terminates, gravity automatically flips back down to normal floor level.
 
 ---
 
-## 11. CHECKPOINT RULES
+## 11. OPENING UNIQUENESS (applies to every level)
+
+An opening is defined as the first **1400 px** of a level ($x = 0\text{ to }1400$).
+To ensure every level feels immediately distinct:
+1. **Opening Signature Computation:**
+   - An opening signature is computed from the ordered elements located within the first $1400\text{ px}$, recording:
+     - Element type (`ground`, `pit`, `fallingPlatform`, `spikes`, `patrolSaw`, `bouncePad`, `flipZone`, `pillar`, `wall`, etc.).
+     - Element width rounded to $10\text{ px}$.
+     - Element $X$ position rounded to $100\text{ px}$.
+     - Platform / surface tier ($y$).
+     - Start position type (`ground`, `island`, `raised_ledge`, etc.).
+   - **No two levels may share an identical opening signature.**
+2. **Hazard & Sequence Constraints:**
+   - The first hazard of any level must differ in type or width from the first hazard of the previous three levels.
+   - The first two elements must not be the same two types in the same order as in any earlier level.
+   - Note: The validator audit checks and reports these constraints (reporting old level comparisons as informational notes), and never auto-modifies levels.
+
+---
+
+## 12. CHECKPOINT RULES
 
 ### Count
 

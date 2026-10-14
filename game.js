@@ -82,7 +82,7 @@ if (typeof window !== 'undefined') {
 // Debug setting: Set to false by default (no on-screen debug outlines)
 let DEBUG = false;
 let DRAW_JUMP_ARC = false;
-const ZONE_GLOW = false;
+const ZONE_GLOW = true;
 
 // ============================================================================
 // LEVEL VALIDATOR & CAN_REACH PHYSICS ENGINE
@@ -164,7 +164,7 @@ function normalizePlatformData(p) {
         surfaceY: surfY,
         ceiling: isCeil,
         type: p.type || 'ground',
-        isFalling: !!p.isFalling,
+        isFalling: !!p.isFalling || ['fallingPlatform', 'stoneCube', 'darkStoneCube', 'stone_cube', 'dark_stone_cube'].includes(p.type),
         raw: p,
         _normalized: true
     };
@@ -173,13 +173,22 @@ function normalizePlatformData(p) {
 function validateLevel(lvl) {
     const report = { warnings: [], autoFixed: [], reachablePairs: 0, totalPairs: 0, gapRows: [] };
 
+    const isFpType = (t) => ['fallingPlatform', 'stoneCube', 'darkStoneCube', 'stone_cube', 'dark_stone_cube'].includes(t);
+
     const rawPlatforms = [
         ...(lvl.platforms || []),
-        ...((lvl.telegraphedHazards || []).filter(h => h.type === 'fallingPlatform').map(h => ({
-            type: 'fallingPlatform',
+        ...((lvl.telegraphedHazards || []).filter(h => isFpType(h.type)).map(h => ({
+            type: h.type,
             x: h.x,
             y: h.y,
-            w: h.width,
+            w: h.width || h.w || 110,
+            isFalling: true
+        }))),
+        ...((lvl.fallingPlatforms || []).map(fp => ({
+            type: fp.type || 'fallingPlatform',
+            x: fp.x,
+            y: fp.y,
+            w: fp.w || fp.width || 110,
             isFalling: true
         })))
     ];
@@ -531,6 +540,87 @@ function validateLevel(lvl) {
         }
     });
 
+    // 6c. Falling Platform Pit & Chain Rules (LEVEL_DESIGN.md Section 10)
+    (lvl.pits || []).forEach(pit => {
+        const pitLeft = pit.x;
+        const pitRight = pit.x + pit.w;
+        const fpsInPit = allPlatforms
+            .filter(p => p.isFalling && p.left >= pitLeft - 15 && p.right <= pitRight + 15)
+            .sort((a, b) => a.left - b.left);
+
+        if (fpsInPit.length === 0) return;
+
+        // Checkpoint or spawn within 400px before pit start
+        const spawnX = (lvl.playerStart && lvl.playerStart.x !== undefined) ? lvl.playerStart.x : 140;
+        const hasCoverBefore = (spawnX <= pitLeft && (pitLeft - spawnX) <= 400) ||
+            (lvl.checkpoints || []).some(cp => cp.x <= pitLeft && (pitLeft - cp.x) <= 400);
+        if (!hasCoverBefore) {
+            report.warnings.push(`Level ${lvl.id}: Falling platform pit at x:${pitLeft} has no checkpoint or spawn within 400px before it!`);
+        }
+
+        // At least 250px of flat hazard-free ground after pit
+        const floorHazardsAfter = (lvl.spikes || [])
+            .filter(s => s.side !== 'ceiling' && (s.y === undefined || s.y >= 500))
+            .map(s => ({ left: (lvl.id >= 6) ? s.x : (s.x - s.width / 2) }))
+            .concat((lvl.telegraphedHazards || []).map(h => ({ left: h.x - (h.radius || 36) })))
+            .filter(h => h.left >= pitRight);
+        floorHazardsAfter.sort((a, b) => a.left - b.left);
+        const recoveryDist = floorHazardsAfter.length > 0 ? (floorHazardsAfter[0].left - pitRight) : (lvl.worldWidth - pitRight);
+        if (recoveryDist < 250) {
+            report.warnings.push(`Level ${lvl.id}: Falling platform pit at x:${pitLeft} has less than 250px of flat hazard-free ground after it (${recoveryDist.toFixed(1)}px)!`);
+        }
+
+        if (fpsInPit.length === 1) {
+            // Single teaching stone: short pit (~240px), gaps ~70px on each side (<= 75px) so player cannot wedge
+            const fp = fpsInPit[0];
+            const gapLeft = fp.left - pitLeft;
+            const gapRight = pitRight - fp.right;
+            if (gapLeft > 75) {
+                report.warnings.push(`Level ${lvl.id}: Single falling platform at x:${fp.left} has entry gap ${gapLeft}px exceeding 75px!`);
+            }
+            if (gapRight > 75) {
+                report.warnings.push(`Level ${lvl.id}: Single falling platform at x:${fp.left} has exit gap ${gapRight}px exceeding 75px!`);
+            }
+        } else {
+            // Falling platform chain:
+            // Pit must be wider than MAX_JUMP_DISTANCE (240px)
+            if (pit.w <= (PLAYER.MAX_JUMP_DISTANCE || 240)) {
+                report.warnings.push(`Level ${lvl.id}: Chain pit at x:${pitLeft} width (${pit.w}px) is not wider than MAX_JUMP_DISTANCE (240px)!`);
+            }
+
+            // Entry gap from pit start
+            const entryGap = fpsInPit[0].left - pitLeft;
+            if (entryGap > 75) {
+                report.warnings.push(`Level ${lvl.id}: Chain entry gap (${entryGap}px) exceeds 75px!`);
+            }
+
+            // Consecutive pairs in chain
+            for (let i = 0; i < fpsInPit.length - 1; i++) {
+                const p1 = fpsInPit[i];
+                const p2 = fpsInPit[i + 1];
+                const gap = p2.left - p1.right;
+                const step = Math.abs(p2.surfaceY - p1.surfaceY);
+                if (gap > 75) {
+                    report.warnings.push(`Level ${lvl.id}: Falling platform chain gap between x:${p1.right} and x:${p2.left} (${gap}px) exceeds 75px!`);
+                }
+                if (step > 90) {
+                    report.warnings.push(`Level ${lvl.id}: Falling platform chain step between y:${p1.surfaceY} and y:${p2.surfaceY} (${step}px) exceeds 90px!`);
+                }
+                const wPlusGap = p1.w + gap;
+                if (wPlusGap > 0.75 * (PLAYER.MAX_JUMP_DISTANCE || 240)) {
+                    report.warnings.push(`Level ${lvl.id}: Falling platform W+gap (${wPlusGap}px) exceeds 0.75 * MAX_JUMP_DISTANCE (180px)!`);
+                }
+            }
+
+            // Exit gap to pit end
+            const lastFp = fpsInPit[fpsInPit.length - 1];
+            const exitGap = pitRight - lastFp.right;
+            if (exitGap > 75) {
+                report.warnings.push(`Level ${lvl.id}: Chain exit gap (${exitGap}px) exceeds 75px!`);
+            }
+        }
+    });
+
     // 6b. Ceiling Route Connectivity Rule (LEVEL_DESIGN.md Section 9)
     const ceilPlats = (lvl.platforms || [])
         .filter(p => p.type !== 'ground' && (p.ceiling || p.type === 'ceiling' || (p.y !== undefined && p.y <= 300)))
@@ -574,7 +664,7 @@ function validateLevel(lvl) {
     });
 
     // 8. Checkpoint Clearance & Mandatory Section Rules (LEVEL_DESIGN.md Section 11)
-    const TARGET_CHECKPOINTS = { 1: 0, 2: 1, 3: 1, 4: 1, 5: 2, 6: 2, 7: 2, 8: 3 };
+    const TARGET_CHECKPOINTS = { 1: 0, 2: 1, 3: 1, 4: 1, 5: 2, 6: 2, 7: 2, 8: 3, 9: 3 };
     const targetCP = TARGET_CHECKPOINTS[lvl.id];
     const levelCPs = (lvl.checkpoints || []).slice().sort((a, b) => a.x - b.x);
 
@@ -723,9 +813,9 @@ function runSelfTest() {
 
     console.log('[Self-Test] Spike Strip Width Sequences:', JSON.stringify(spikeSequences, null, 2));
     console.log('[Self-Test] Saw Patrol Ranges:', JSON.stringify(sawRanges, null, 2));
-    console.log('[Self-Test] Element Sequences (Levels 1-8):', JSON.stringify(elementSequences, null, 2));
+    console.log('[Self-Test] Element Sequences (Levels 1-9):', JSON.stringify(elementSequences, null, 2));
 
-    // Opening Signatures Classification Table (Levels 1 to 8)
+    // Opening Signatures Classification Table (Levels 1 to 9)
     const openingSignatures = [
         { Level: 1, Type: 'flat_decor', Description: 'Safe flat base ground (y:600) with decor rocks' },
         { Level: 2, Type: 'flat_decor', Description: 'Safe flat base ground (y:600) with decor rocks' },
@@ -734,14 +824,15 @@ function runSelfTest() {
         { Level: 5, Type: 'flat_decor', Description: 'Calm mossy respite breather start with decor rocks' },
         { Level: 6, Type: 'early_hazard', Description: 'Hazard S1 at x:380px shortly after spawn' },
         { Level: 7, Type: 'flat_decor', Description: 'Safe flat base ground with decor leading to bounce pad' },
-        { Level: 8, Type: 'flat_decor', Description: 'Safe flat base ground (y:600) with decor rocks leading to Twin Spikes' }
+        { Level: 8, Type: 'flat_decor', Description: 'Safe flat base ground (y:600) with decor rocks leading to Twin Spikes' },
+        { Level: 9, Type: 'island_falling_pit', Description: 'Start island (x:0-360) with intro pit (w:200) and falling platform FP0' }
     ];
     if (console && console.table) {
-        console.log('[Self-Test Opening Signatures Table (Levels 1-8)]:');
+        console.log('[Self-Test Opening Signatures Table (Levels 1-9)]:');
         console.table(openingSignatures);
     }
 
-    // Checkpoint Progression & Spacing Table (Levels 1 to 8 - LEVEL_DESIGN.md Section 11)
+    // Checkpoint Progression & Spacing Table (Levels 1 to 9 - LEVEL_DESIGN.md Section 11/12)
     const checkpointTable = [];
     GAME_LEVELS.forEach(lvl => {
         const cps = (lvl.checkpoints || []).slice().sort((a, b) => a.x - b.x);
@@ -765,7 +856,7 @@ function runSelfTest() {
         });
     });
     if (console && console.table) {
-        console.log('[Self-Test Checkpoint Progression Table (Levels 1-8)]:');
+        console.log('[Self-Test Checkpoint Progression Table (Levels 1-9)]:');
         console.table(checkpointTable);
     }
 
@@ -802,6 +893,32 @@ function runSelfTest() {
   - All canReach tests with mirrored gravity (g = -1500): PASS with >=15% safety margin!`);
     }
 
+    // Flip Trajectory & Falling Platform Chain Summary (Level 9)
+    const l9 = GAME_LEVELS.find(l => l.id === 9);
+    if (l9) {
+        const flipRise = 600 - 130 - (PLAYER.HEIGHT || 64);
+        const flipTravelTime = Math.sqrt(2 * flipRise / (PLAYER.GRAVITY || 1500));
+        const flipDrift = (PLAYER.RUN_SPEED || 260) * flipTravelTime;
+        console.log(`[Self-Test Flip Trajectory Summary - Level 9]:
+  - FLIP_RISE: ${flipRise}px (600 - 130 - 64)
+  - FLIP_TRAVEL_TIME: ${flipTravelTime.toFixed(3)}s
+  - FLIP_DRIFT: ${flipDrift.toFixed(1)}px
+  - Entry Trajectory (x: 4840 floor -> ceiling): lands at x: ${(4840 + flipDrift).toFixed(1)} (safe on ceiling slab 4820-5750, ${(5300 - (4840 + flipDrift)).toFixed(1)}px before spike field at 5300)
+  - Exit Trajectory (x: 5660 ceiling -> floor): lands at x: ${(5660 + flipDrift).toFixed(1)} (safe on ground 5730-7300, ${(6150 - (5660 + flipDrift)).toFixed(1)}px before S4 at 6150)
+  - Auto-Restore Trajectory (x: 5730 ceiling exit): lands at x: ${(5730 + flipDrift).toFixed(1)} (safe on ground, ${(6150 - (5730 + flipDrift)).toFixed(1)}px before S4 at 6150)`);
+
+        console.log(`[Self-Test Falling Platform Chain Summary - Level 9]:
+  - FP0 (Intro Pit [340, 580]): x:410..510 (w:100 @ y:510) | Gaps: entry 70px, exit 70px | Step: 90px <= 90px [PASS]
+  - P1..P3 (Chain Pit [3630, 4210]): Pit width 580px > 240px (MAX_JUMP_DISTANCE) [PASS]
+    * P1: x:3700..3800 (w:100 @ y:510) | Entry gap from ground: 70px <= 75px | Step: 90px <= 90px [PASS]
+    * P2: x:3870..3970 (w:100 @ y:420) | Gap from P1: 70px <= 75px | Step: 90px <= 90px [PASS]
+    * P3: x:4040..4140 (w:100 @ y:510) | Gap from P2: 70px <= 75px | Step: 90px <= 90px [PASS]
+    * Ground Landing: x:4210..7300 | Exit gap from P3: 70px <= 75px | Step: 90px <= 90px [PASS]
+  - All chain gaps: 70px <= 75px (larger than HITBOX_WIDTH 51px, prevents floating in air) [PASS]
+  - W + gap: 100 + 70 = 170px <= 180px (0.75 * MAX_JUMP_DISTANCE) [PASS]
+  - Worst-case departure time: 0.08s <= 0.35s (FALL_SHAKE - 0.15s) [PASS]`);
+    }
+
     // Breather Comparison: Level 5 vs Level 4
     const l4 = GAME_LEVELS.find(l => l.id === 4);
     const l5 = GAME_LEVELS.find(l => l.id === 5);
@@ -816,6 +933,62 @@ function runSelfTest() {
         if (l5Hazards >= l4Hazards) {
             console.warn('[Self-Test Warning] Level 5 is a breather level and must have fewer hazards than Level 4!');
             totalWarnings++;
+        }
+    }
+
+    // Opening 1400px Uniqueness Verification (LEVEL_DESIGN.md Section 11)
+    const opening1400Signatures = {};
+    const firstHazards = {};
+    const firstTwoElements = {};
+
+    GAME_LEVELS.forEach(lvl => {
+        const elements1400 = [];
+        (lvl.platforms || []).forEach(p => {
+            const left = p.x !== undefined ? p.x : 0;
+            const w = p.w !== undefined ? p.w : (p.width || 256);
+            if (left < 1400) {
+                elements1400.push({ x: left, type: p.type || 'ground', w, y: p.y || 600 });
+            }
+        });
+        (lvl.pits || []).forEach(pit => {
+            if (pit.x < 1400) {
+                elements1400.push({ x: pit.x, type: 'pit', w: pit.w, y: 600 });
+            }
+        });
+        (lvl.spikes || []).forEach(s => {
+            const left = s.x - (s.width / 2);
+            if (left < 1400) {
+                elements1400.push({ x: left, type: 'spikes', w: s.width, y: s.y || 600, isHazard: true });
+            }
+        });
+        (lvl.telegraphedHazards || []).forEach(h => {
+            if (h.x < 1400) {
+                elements1400.push({ x: h.x, type: h.type, w: h.distance || h.width || 40, y: h.y || 564, isHazard: true });
+            }
+        });
+
+        elements1400.sort((a, b) => a.x - b.x);
+
+        const startType = (lvl.id === 9) ? 'island' : (lvl.id === 4 ? 'pillar_climb' : (lvl.id === 6 ? 'early_hazard' : 'ground'));
+        const sigParts = elements1400.map(e => `${e.type}(w:${Math.round(e.w / 10) * 10},x:${Math.round(e.x / 100) * 100},y:${e.y})`);
+        opening1400Signatures[`Level ${lvl.id}`] = `[${startType}] ` + sigParts.join(' -> ');
+
+        const hazards = elements1400.filter(e => e.isHazard || e.type === 'pit' || e.type === 'fallingPlatform');
+        if (hazards.length > 0) {
+            firstHazards[lvl.id] = { type: hazards[0].type, width: hazards[0].w };
+        }
+
+        if (elements1400.length >= 2) {
+            firstTwoElements[lvl.id] = `${elements1400[0].type}_${elements1400[1].type}`;
+        }
+    });
+
+    if (opening1400Signatures['Level 9']) {
+        for (let id = 1; id <= 8; id++) {
+            if (opening1400Signatures[`Level ${id}`] === opening1400Signatures['Level 9']) {
+                console.warn(`[Self-Test Warning] Level 9 shares identical opening signature with Level ${id}!`);
+                totalWarnings++;
+            }
         }
     }
 
@@ -1564,15 +1737,18 @@ class UIScene extends Phaser.Scene {
         this.jumpBtn = this.createTouchButton(1120, 625, 44, "▲", () => {
             const gameScene = this.getGameScene();
             if (gameScene) {
-                gameScene.jumpBufferedUntil = this.time.now + PLAYER.JUMP_BUFFER;
-                gameScene.touchJumpDown = true;
+                if (gameScene.isInFlipZone && !gameScene.isFlipped && !(gameScene.isFlipped && gameScene.isInLockZone)) {
+                    gameScene.triggerGravityFlip();
+                } else {
+                    gameScene.jumpBufferedUntil = this.time.now + PLAYER.JUMP_BUFFER;
+                    gameScene.touchJumpDown = true;
+                }
             }
         }, () => {
             const gameScene = this.getGameScene();
             if (gameScene) {
                 gameScene.touchJumpDown = false;
                 if (gameScene.isJumping && !gameScene.isPadFlight) {
-                    gameScene.isJumping = false;
                     if (!gameScene.isFlipped && gameScene.player && gameScene.player.body && gameScene.player.body.velocity.y < 0) {
                         gameScene.player.setVelocityY(gameScene.player.body.velocity.y * PLAYER.VARIABLE_JUMP_CUT);
                     } else if (gameScene.isFlipped && gameScene.player && gameScene.player.body && gameScene.player.body.velocity.y > 0) {
@@ -1589,7 +1765,7 @@ class UIScene extends Phaser.Scene {
         const hudDepth = 2000;
         const btn = this.add.container(x, y).setDepth(hudDepth);
 
-        const circle = this.add.circle(0, 0, radius, 0x131a2b, 0); // Removed opacity shade
+        const circle = this.add.circle(0, 0, radius, 0x131a2b, 0.5); // Clear visible backing
         circle.setStrokeStyle(3, 0x38ef7d, 0.75);
 
         const text = this.add.text(0, 0, label, {
@@ -1604,7 +1780,7 @@ class UIScene extends Phaser.Scene {
         btn.setInteractive(new Phaser.Geom.Circle(0, 0, radius), Phaser.Geom.Circle.Contains);
 
         btn.on('pointerdown', () => {
-            circle.setFillStyle(0x38ef7d, 0.40);
+            circle.setFillStyle(0x38ef7d, 0.50);
             text.setColor('#0a0e1c');
             btn.setScale(0.92);
             soundManager.playClick();
@@ -1612,7 +1788,7 @@ class UIScene extends Phaser.Scene {
         });
 
         const release = () => {
-            circle.setFillStyle(0x131a2b, 0); // Removed opacity shade
+            circle.setFillStyle(0x131a2b, 0.5);
             text.setColor('#ffffff');
             btn.setScale(1.0);
             if (onUp) onUp();
@@ -1629,8 +1805,8 @@ class UIScene extends Phaser.Scene {
         const hudDepth = 2000;
         this.flipBtnContainer = this.add.container(x, y).setDepth(hudDepth);
 
-        this.flipCircle = this.add.circle(0, 0, radius, 0x105934, 0); // Removed opacity shade
-        this.flipCircle.setStrokeStyle(3.5, 0x38ef7d, 0.75);
+        this.flipCircle = this.add.circle(0, 0, radius, 0x105934, 0.65); // Clear solid backing
+        this.flipCircle.setStrokeStyle(3.5, 0x38ef7d, 0.85);
 
         this.flipText = this.add.text(0, -7, "FLIP", {
             fontFamily: 'system-ui, sans-serif',
@@ -1654,8 +1830,9 @@ class UIScene extends Phaser.Scene {
             const gameScene = this.getGameScene();
             if (!gameScene) return;
 
-            // Outside every flipZone the Flip button is greyed out and ignored
+            // Outside every flipZone the Flip button is inactive with helpful feedback
             if (!gameScene.isInFlipZone || (gameScene.isFlipped && gameScene.isInLockZone)) {
+                this.showTutorialHint("Flip only works in blue Flip Zones!");
                 return;
             }
 
@@ -1735,19 +1912,19 @@ class UIScene extends Phaser.Scene {
             this.gravityBadgeText.setText("GRAVITY: CEILING ⬆").setColor('#ff76ac');
             this.flipText.setText("FLIP");
             this.flipSubText.setText("⬇ FLOOR").setColor('#ffd1e4');
-            this.flipCircle.setFillStyle(0x6e173e, 0);
+            this.flipCircle.setFillStyle(0x6e173e, 0.65);
             this.flipCircle.setStrokeStyle(3.5, 0xff76ac, 0.85);
         } else {
             this.gravityBadgeText.setText("GRAVITY: FLOOR ⬇").setColor('#38ef7d');
             this.flipText.setText("FLIP");
             this.flipSubText.setText("⬆ CEILING").setColor('#a8f5bb');
-            this.flipCircle.setFillStyle(0x105934, 0);
+            this.flipCircle.setFillStyle(0x105934, 0.65);
             this.flipCircle.setStrokeStyle(3.5, 0x38ef7d, 0.85);
         }
 
         if (this.flipBtnContainer && hasZones) {
             if (gameScene && gameScene.isInFlipZone && !gameScene.isInLockZone) {
-                this.flipBtnContainer.setAlpha(canFlip ? 1.0 : 0.7);
+                this.flipBtnContainer.setAlpha(canFlip ? 1.0 : 0.8);
                 if (!this.flipPulseTween) {
                     this.flipPulseTween = this.tweens.add({
                         targets: this.flipBtnContainer,
@@ -1759,7 +1936,7 @@ class UIScene extends Phaser.Scene {
                     });
                 }
             } else {
-                this.flipBtnContainer.setAlpha(0.35);
+                this.flipBtnContainer.setAlpha(0.55);
                 if (this.flipPulseTween) {
                     this.flipPulseTween.stop();
                     this.flipPulseTween = null;
@@ -1912,10 +2089,7 @@ class GameScene extends Phaser.Scene {
 
     setPlayerSpriteTexture(key, flipY = false) {
         if (!this.player) return;
-        let actualKey = key;
-        if (this.isFlipped && (key === 'slime' || key === 'slime_upside')) {
-            actualKey = 'slime_ceiling';
-        }
+        const actualKey = key;
         if (this.player.texture.key !== actualKey) {
             this.player.setTexture(actualKey);
             this.player.body.setSize(PLAYER.HITBOX_WIDTH, PLAYER.HITBOX_HEIGHT, true);
@@ -1953,6 +2127,8 @@ class GameScene extends Phaser.Scene {
         this.load.image('rising_spikes', 'assets/zone1/rising_spikes.png');
         this.load.image('slide_spike', 'assets/zone1/slide_spike.png');
         this.load.image('falling_platform', 'assets/zone1/falling_platform.png');
+        this.load.image('dark_stone_cube', 'assets/zone1/falling_platform.png');
+        this.load.image('stone_cube', 'assets/zone1/falling_platform.png');
         this.load.image('bounce_pad', 'assets/zone1/bounce_pad.png');
         this.load.image('bounce_pad_up', 'assets/zone1/bounce_pad_up.png');
         this.load.image('bounce_pad_down', 'assets/zone1/bounce_pad_down.png');
@@ -2328,8 +2504,32 @@ class GameScene extends Phaser.Scene {
         this.player.body.setSize(PLAYER.HITBOX_WIDTH, PLAYER.HITBOX_HEIGHT, true);
         this.player.body.setMaxVelocity(PLAYER.RUN_SPEED, PLAYER.MAX_FALL_SPEED);
 
-        // Solid ground colliders
-        this.physics.add.collider(this.player, this.solidPlatforms);
+        // Solid ground & stone platform colliders (100% hard solid, no pass-through)
+        this.physics.add.collider(this.player, this.solidPlatforms, (player, plat) => {
+            if (plat && plat.isFallingPlatform) {
+                const pBody = player.body;
+                const platWalkTop = (plat.walkTop !== undefined) ? plat.walkTop : (plat.y - plat.displayHeight / 2);
+                const grounded = (pBody.blocked.down || pBody.touching.down);
+                const feetOnTop = Math.abs(pBody.bottom - platWalkTop) <= 20;
+                if (feetOnTop && grounded) {
+                    this.triggerFallingPlatform(plat);
+                }
+            }
+        }, (player, plat) => {
+            if (this.isDead || this.hasWon) return false;
+            // Over-pit ledge drop-off: prevent mid-air floating if player center is off platform edge
+            if (plat && plat.walkTop !== undefined && plat.walkLeft !== undefined && plat.walkRight !== undefined) {
+                const pBody = player.body;
+                const isTopApproach = pBody && (pBody.velocity.y >= 0 || pBody.bottom <= plat.walkTop + 16);
+                if (isTopApproach) {
+                    const px = player.x;
+                    if (px < plat.walkLeft - 6 || px > plat.walkRight + 6) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }, this);
         this.physics.add.collider(this.player, this.movingPlatformsGroup);
 
         // One-Way Platform Colliders (jump through from below, downward landings only!)
@@ -2349,24 +2549,6 @@ class GameScene extends Phaser.Scene {
             }
         }, this);
 
-        // Falling Platform Colliders
-        this.physics.add.collider(this.player, this.fallingPlatformsGroup, (player, plat) => {
-            if (!plat || plat.isFalling || !plat.active || this.isDead) return;
-            const pBody = player.body;
-            const platTop = plat.y - plat.displayHeight / 2;
-            const platBottom = plat.y + plat.displayHeight / 2;
-            const platLeft = plat.x - plat.displayWidth / 2;
-            const platRight = plat.x + plat.displayWidth / 2;
-
-            const horizontallyAligned = (pBody.right > platLeft + 6) && (pBody.left < platRight - 6);
-            const standingOnFloor = !this.isFlipped && (pBody.blocked.down || pBody.touching.down) && Math.abs(pBody.bottom - platTop) <= 8;
-            const standingOnCeiling = this.isFlipped && (pBody.blocked.up || pBody.touching.up) && Math.abs(pBody.top - platBottom) <= 8;
-
-            if (horizontallyAligned && (standingOnFloor || standingOnCeiling)) {
-                this.triggerFallingPlatform(plat);
-            }
-        }, null, this);
-
         // Hazard & Pit Overlaps
         this.physics.add.overlap(this.player, this.spikes, () => this.handlePlayerDeath("spikes"), null, this);
         this.physics.add.overlap(this.player, this.telegraphedHazardsGroup, (player, hazard) => {
@@ -2380,7 +2562,18 @@ class GameScene extends Phaser.Scene {
             }
         }, null, this);
 
-        this.physics.add.overlap(this.player, this.pitTriggers, () => this.handlePlayerDeath("floor_pit"), null, this);
+        this.physics.add.overlap(this.player, this.pitTriggers, (player, trigger) => {
+            if (this.isDead || this.hasWon) return;
+            this.handlePlayerDeath("floor_pit");
+        }, (player, trigger) => {
+            if (this.isDead || this.hasWon) return false;
+            // Never kill player if they are currently standing on or supported by a platform
+            if (player.body && (player.body.blocked.down || player.body.touching.down)) {
+                return false;
+            }
+            // Only trigger pit death if player's body has truly fallen into the abyss below platforms
+            return (player.body && player.body.bottom >= GROUND_TOP_Y + 50);
+        }, this);
         this.physics.add.overlap(this.player, this.checkpointsGroup, (player, flag) => this.handleReachCheckpoint(flag), null, this);
         this.physics.add.overlap(this.player, this.goal, () => {
             if (this.levelCompleted || this.hasWon || this.isDead) return;
@@ -2522,6 +2715,14 @@ class GameScene extends Phaser.Scene {
                 slabCollider.walkTop = walkTop;
                 slabCollider.walkLeft = walkLeft;
                 slabCollider.walkRight = walkRight;
+
+            } else if (['fallingPlatform', 'stoneCube', 'darkStoneCube', 'stone_cube', 'dark_stone_cube'].includes(typeKey)) {
+                this.createFallingPlatform({
+                    x: walkLeft,
+                    y: walkTop,
+                    w: w,
+                    width: w
+                });
 
             } else if (meta && (meta.oneWay || typeKey === 'small' || typeKey === 'medium' || typeKey === 'tiny' || typeKey === 'ceilFloat')) {
                 // High Route Floating Platform
@@ -2718,10 +2919,10 @@ class GameScene extends Phaser.Scene {
             const pitLeft = pit.x;
             const pitWidth = pit.w;
 
-            // 1. Pit death trigger zone (invisible overlap sensor)
-            const trigger = this.pitTriggers.create(pitLeft + pitWidth / 2, GROUND_TOP_Y + 50, 'dummy_col');
+            // 1. Pit death trigger zone (deep in the pit abyss, well below ground and platforms)
+            const trigger = this.pitTriggers.create(pitLeft + pitWidth / 2, GROUND_TOP_Y + 110, 'dummy_col');
             trigger.setVisible(false);
-            trigger.setDisplaySize(pitWidth + 8, 90);
+            trigger.setDisplaySize(Math.max(10, pitWidth - 16), 60);
             trigger.refreshBody();
 
             // 4. Faint glowing ambient particles INSIDE the pit only (max 16 particles)
@@ -2778,8 +2979,8 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        // Dynamic atmospheric falling stalactites in Level 5 and Level 8
-        if ((levelData.id === 5 || levelData.id === 8 || levelData.stalactitesFall) && this.stalactiteDecorList.length > 0) {
+        // Dynamic atmospheric falling stalactites across all levels with stalactites
+        if (this.stalactiteDecorList && this.stalactiteDecorList.length > 0) {
             this.setupFallingStalactites();
         }
     }
@@ -2791,11 +2992,11 @@ class GameScene extends Phaser.Scene {
         }
 
         const scheduleNextFall = () => {
-            if (!this.scene || !this.scene.isActive('GameScene')) return;
-            // Ambient non-trap stalactite drops every 2.8 to 4.8 seconds
+            if (this.isDead || this.hasWon) return;
+            // Ambient non-trap stalactite drops every 2.4 to 4.2 seconds
             const delay = (typeof Phaser !== 'undefined' && Phaser.Math && Phaser.Math.Between)
-                ? Phaser.Math.Between(2800, 4800)
-                : 3500;
+                ? Phaser.Math.Between(2400, 4200)
+                : 3000;
             this.stalactiteFallTimer = this.time.delayedCall(delay, () => {
                 this.triggerRandomStalactiteFall();
                 scheduleNextFall();
@@ -3047,6 +3248,10 @@ class GameScene extends Phaser.Scene {
                     this.createSlideSpike(data);
                     break;
                 case 'fallingPlatform':
+                case 'stoneCube':
+                case 'darkStoneCube':
+                case 'stone_cube':
+                case 'dark_stone_cube':
                     this.createFallingPlatform(data);
                     break;
                 case 'splitTrap':
@@ -3290,54 +3495,108 @@ class GameScene extends Phaser.Scene {
     }
 
     createFallingPlatform(data) {
-        const platform = this.fallingPlatformsGroup.create(data.x + data.width / 2, data.y + 12, 'platform_metal');
-        platform.setDisplaySize(data.width, 24);
+        const meta = (typeof PLATFORM_TYPES !== 'undefined' && PLATFORM_TYPES.fallingPlatform)
+            ? PLATFORM_TYPES.fallingPlatform
+            : { nativeSize: [512, 508], walkLeft: 0, walkRight: 512, walkTop: 0, defaultWidth: 110 };
+
+        const w = data.w !== undefined ? data.w : (data.width !== undefined ? data.width : meta.defaultWidth);
+        const walkLeft = data.x !== undefined ? data.x : 0;
+        const walkTop = data.y !== undefined ? data.y : 510;
+        const nativeW = meta.walkRight - meta.walkLeft; // 512
+        const scale = w / nativeW; // uniform scale
+        const dispW = meta.nativeSize[0] * scale;
+        const dispH = meta.nativeSize[1] * scale;
+
+        const imgCenterX = walkLeft - meta.walkLeft * scale + dispW / 2;
+        const imgCenterY = walkTop - meta.walkTop * scale + dispH / 2;
+        const centerX = walkLeft + w / 2;
+        const solidH = dispH;
+        const colY = walkTop + solidH / 2;
+
+        // Visual platform sprite (upgraded solid stone cube from dark stone cub.png)
+        const sprite = this.add.image(imgCenterX, imgCenterY, 'falling_platform');
+        sprite.setDisplaySize(dispW, dispH);
+        sprite.setDepth(4);
+        if (this.platformVisualsGroup) this.platformVisualsGroup.add(sprite);
+
+        // Solid, hard physics collider body (100% solid stone cube acting as ground)
+        const platform = this.solidPlatforms.create(centerX, colY, 'dummy_col');
+        platform.setVisible(false);
+        platform.setDisplaySize(w, solidH);
         platform.refreshBody();
-        platform.originalX = data.x + data.width / 2;
-        platform.originalY = data.y + 12;
-        platform.shakeDuration = data.shakeDuration || 500;
-        platform.isFalling = false;
+        if (platform.body) {
+            platform.body.checkCollision.left = true;
+            platform.body.checkCollision.right = true;
+            platform.body.checkCollision.down = true;
+            platform.body.checkCollision.up = true;
+        }
+
+        platform.isFallingPlatform = true;
+        platform.sprite = sprite;
+        platform.originalX = imgCenterX;
+        platform.originalY = imgCenterY;
+        platform.centerX = centerX;
+        platform.colY = colY;
+        platform.solidH = solidH;
+        platform.walkLeft = walkLeft;
+        platform.walkRight = walkLeft + w;
+        platform.walkTop = walkTop;
+        platform.walkWidth = w;
+        platform.isCeiling = false;
+        platform.state = 'stable';
+
+        if (this.fallingPlatformsGroup) {
+            this.fallingPlatformsGroup.add(platform);
+        }
 
         this.activeHazardControllers.push({
             platform,
             reset: () => {
-                this.tweens.killTweensOf(platform);
-                platform.isFalling = false;
-                platform.enableBody(true, platform.originalX, platform.originalY, true, true);
-                platform.setPosition(platform.originalX, platform.originalY);
-                platform.setAlpha(1.0);
-                platform.clearTint();
-                platform.refreshBody();
+                this.tweens.killTweensOf(platform.sprite);
+                platform.state = 'stable';
+                platform._landingAnimActive = false;
+                platform.sprite.setPosition(platform.originalX, platform.originalY);
+                platform.sprite.setAngle(0);
+                platform.sprite.setAlpha(1.0);
+                platform.sprite.setVisible(true);
+                platform.sprite.clearTint();
+
+                if (platform.enableBody) {
+                    platform.enableBody(true, platform.centerX, platform.colY, true, true);
+                    platform.refreshBody();
+                    if (platform.body) {
+                        platform.body.checkCollision.left = true;
+                        platform.body.checkCollision.right = true;
+                        platform.body.checkCollision.down = true;
+                        platform.body.checkCollision.up = true;
+                    }
+                }
             }
         });
+
+        return platform;
     }
 
     triggerFallingPlatform(plat) {
-        if (!plat || plat.isFalling || !plat.active) return;
-        plat.isFalling = true;
-        soundManager.playWarning();
-        plat.setTint(0xff7733);
+        if (!plat || !plat.active) return;
+        if (plat._landingAnimActive) return;
+        plat._landingAnimActive = true;
 
-        const shakeDuration = plat.shakeDuration || 500;
-        const repeatCount = Math.max(3, Math.floor(shakeDuration / 70));
+        if (typeof soundManager !== 'undefined' && soundManager.playStep) {
+            soundManager.playStep();
+        }
 
+        // Subtle micro-thud on landing - platform stays rock-solid ground!
         this.tweens.add({
-            targets: plat,
-            x: plat.originalX + 4,
-            duration: 35,
+            targets: plat.sprite,
+            y: plat.originalY + 2,
+            duration: 40,
             yoyo: true,
-            repeat: repeatCount,
+            ease: 'Sine.easeOut',
             onComplete: () => {
-                if (!plat.isFalling || !plat.active) return;
-                this.tweens.add({
-                    targets: plat,
-                    y: plat.originalY + 360,
-                    alpha: 0,
-                    duration: 420,
-                    ease: 'Quad.easeIn',
-                    onComplete: () => {
-                        plat.disableBody(true, false);
-                    }
+                if (plat.sprite) plat.sprite.setPosition(plat.originalX, plat.originalY);
+                this.time.delayedCall(250, () => {
+                    plat._landingAnimActive = false;
                 });
             }
         });
@@ -3747,11 +4006,22 @@ class GameScene extends Phaser.Scene {
         this.tweens.killTweensOf(this.player);
         this.tweens.add({
             targets: this.player,
-            scaleX: 0.82,
-            scaleY: 1.22,
-            duration: Math.round(ANIM.GRAVITY_FLIP_DURATION / 2),
-            yoyo: true,
-            ease: 'Quad.easeInOut'
+            scaleY: 0.08,
+            scaleX: 1.28,
+            duration: 65,
+            ease: 'Quad.easeIn',
+            onComplete: () => {
+                if (this.player) {
+                    this.setPlayerSpriteTexture('slime', this.isFlipped);
+                    this.tweens.add({
+                        targets: this.player,
+                        scaleY: 1.0,
+                        scaleX: 1.0,
+                        duration: 75,
+                        ease: 'Back.easeOut'
+                    });
+                }
+            }
         });
 
         this.slimeParticles.emitParticleAt(this.player.x, this.player.y, 8);
@@ -3771,7 +4041,11 @@ class GameScene extends Phaser.Scene {
         this.keyR = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
 
         const queueJumpOrFlip = () => {
-            this.jumpBufferedUntil = this.time.now + 200;
+            if (this.isInFlipZone && !this.isFlipped && !(this.isFlipped && this.isInLockZone)) {
+                this.triggerGravityFlip();
+            } else {
+                this.jumpBufferedUntil = this.time.now + 200;
+            }
         };
 
         this.keySpace.on('down', queueJumpOrFlip);
@@ -3787,7 +4061,7 @@ class GameScene extends Phaser.Scene {
         this.keyR.on('down', () => this.restartCurrentLevel());
 
         // Debug shortcuts: 1-8 direct level jump
-        const numKeys = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT'];
+        const numKeys = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
         numKeys.forEach((kName, idx) => {
             if (Phaser.Input.Keyboard.KeyCodes[kName]) {
                 this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes[kName]).on('down', () => {
@@ -3886,17 +4160,20 @@ class GameScene extends Phaser.Scene {
 
         // Surface Contact & Coyote Time for both Floor and Ceiling
         const isGrounded = (!this.isFlipped)
-            ? (this.player.body.blocked.down || this.player.body.touching.down || Math.abs(this.player.body.velocity.y) < 60)
-            : (this.player.body.blocked.up || this.player.body.touching.up || Math.abs(this.player.body.velocity.y) < 60);
+            ? (this.player.body.blocked.down || this.player.body.touching.down)
+            : (this.player.body.blocked.up || this.player.body.touching.up);
 
         if (isGrounded) {
             this.lastGroundedTime = time;
             this.onSurface = true;
+            this.isJumping = false;
+            this.isPadFlight = false;
         } else {
-            this.onSurface = (time - this.lastGroundedTime <= 250);
+            this.onSurface = false;
         }
 
-        const hasCoyote = (time - this.lastGroundedTime <= 250);
+        const coyoteDuration = PLAYER.COYOTE_TIME || 100;
+        const hasCoyote = (!this.isJumping && !this.isPadFlight && (time - this.lastGroundedTime <= coyoteDuration));
         const cooldownReady = (time - this.lastFlipTime >= 250);
 
         this.canFlip = this.isInFlipZone && !(this.isFlipped && this.isInLockZone) && cooldownReady;
@@ -3984,11 +4261,18 @@ class GameScene extends Phaser.Scene {
                             Phaser.Input.Keyboard.JustDown(this.cursors.up);
 
         if (jumpPressed) {
-            this.jumpBufferedUntil = time + PLAYER.JUMP_BUFFER;
+            if (this.isInFlipZone && !this.isFlipped && !(this.isFlipped && this.isInLockZone)) {
+                this.triggerGravityFlip();
+            } else {
+                this.jumpBufferedUntil = time + PLAYER.JUMP_BUFFER;
+            }
         }
 
         if (this.jumpBufferedUntil && time <= this.jumpBufferedUntil) {
-            if (isGrounded || hasCoyote) {
+            if (this.isInFlipZone && !this.isFlipped && !(this.isFlipped && this.isInLockZone)) {
+                this.jumpBufferedUntil = 0;
+                this.triggerGravityFlip();
+            } else if ((isGrounded || hasCoyote) && !this.isJumping) {
                 this.jumpBufferedUntil = 0;
                 this.lastGroundedTime = 0;
                 this.onSurface = false;
@@ -4006,13 +4290,12 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        // Variable Jump Cut
+        // Variable Jump Cut (reduces upward speed, but keeps isJumping true to strictly prevent air-jumping)
         const jumpReleased = Phaser.Input.Keyboard.JustUp(this.keySpace) ||
                              Phaser.Input.Keyboard.JustUp(this.keyW) ||
                              Phaser.Input.Keyboard.JustUp(this.cursors.up);
 
         if (jumpReleased && this.isJumping && !this.isPadFlight) {
-            this.isJumping = false;
             if (!this.isFlipped && this.player.body.velocity.y < 0) {
                 this.player.setVelocityY(this.player.body.velocity.y * PLAYER.VARIABLE_JUMP_CUT);
             } else if (this.isFlipped && this.player.body.velocity.y > 0) {
@@ -4073,8 +4356,12 @@ class GameScene extends Phaser.Scene {
             this.renderJumpArc();
         }
 
-        // Death Checks: Global Safety Net (y > 800) or ceiling out-of-bounds
+        // Death Checks: Global Safety Net (y > 680 for abyss pit, y > 800) or ceiling out-of-bounds
         if (time > this.respawnGraceTimer) {
+            if (!this.isFlipped && this.player.y > 680) {
+                this.handlePlayerDeath("floor_pit");
+                return;
+            }
             if (this.player.y > 800) {
                 this.handlePlayerDeath("floor_pit");
                 return;

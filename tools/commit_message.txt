@@ -1,0 +1,7 @@
+feat: upgrade falling platform asset, fix pit gaps, flip UP arrow and sprite rotation
+
+- Upgrade dark stone falling platform asset with solid geometry and clean textures
+- Fix floating in air over pit edges by widening gap to 70px (> 51px hitbox) and ledge drop-off logic
+- Support UP arrow / button for gravity flip in flip zones
+- Fix ceiling flip player sprite rotation and inversion
+- Verified with selftest: 0 warnings, 0 errors

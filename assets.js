@@ -20,7 +20,9 @@
             zone1_wall: 'assets/zone1/zone1_wall.png',
             zone1_ceiling: 'assets/zone1/zone1_ceiling.png',
             zone1_ceil_float: 'assets/zone1/zone1_ceil_float.png',
-            platform_metal: 'assets/zone1/platform_metal.png'
+            platform_metal: 'assets/zone1/platform_metal.png',
+            falling_platform: 'assets/zone1/falling_platform.png',
+            dark_stone_cube: 'assets/zone1/falling_platform.png'
         },
         hazards: {
             saw: 'assets/zone1/saw.png',
@@ -167,6 +169,45 @@
             oneWay: true,
             ceiling: false,
             isMoving: true
+        },
+        fallingPlatform: {
+            texture: 'falling_platform',
+            file: 'falling_platform.png',
+            nativeSize: [512, 508],
+            walkLeft: 0,
+            walkRight: 512,
+            walkTop: 0,
+            designThickness: 64,
+            defaultWidth: 110,
+            oneWay: false,
+            ceiling: false,
+            isFalling: true
+        },
+        stoneCube: {
+            texture: 'falling_platform',
+            file: 'falling_platform.png',
+            nativeSize: [512, 508],
+            walkLeft: 0,
+            walkRight: 512,
+            walkTop: 0,
+            designThickness: 64,
+            defaultWidth: 110,
+            oneWay: false,
+            ceiling: false,
+            isFalling: false
+        },
+        darkStoneCube: {
+            texture: 'falling_platform',
+            file: 'falling_platform.png',
+            nativeSize: [512, 508],
+            walkLeft: 0,
+            walkRight: 512,
+            walkTop: 0,
+            designThickness: 64,
+            defaultWidth: 110,
+            oneWay: false,
+            ceiling: false,
+            isFalling: false
         }
     };
 

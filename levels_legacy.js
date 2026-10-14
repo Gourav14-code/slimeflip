@@ -922,7 +922,7 @@ var GAME_LEVELS = [
         playerStart: { x: 140, y: 568 }, // Standard visible floor spawn
 
         checkpoints: [
-            { id: 'cp_l8_mid', x: 2300, y: 600 }, // Checkpoint 1 before Flip Section 1 & Pit
+            { id: 'cp_l8_mid', x: 1850, y: 600 }, // Checkpoint 1 before Flip Section 1 & Pit
             { id: 'cp_l8_b',   x: 4800, y: 600 }, // Checkpoint 2 before Flip Section 2
             { id: 'cp_l8_c',   x: 6050, y: 600 }  // Checkpoint 3 after Flip Section 2 before final gauntlet
         ],
@@ -955,9 +955,12 @@ var GAME_LEVELS = [
             { type: 'ceiling', x: 2030, y: 130, w: 640, ceiling: true },
 
             // Upper Floating Islands (in the upper section for ceiling/aerial route):
-            { type: 'ceilFloat', x: 2720, y: 220, w: 256, ceiling: true, oneWay: false },
-            { type: 'ceilFloat', x: 3040, y: 280, w: 256, ceiling: true, oneWay: false },
-            { type: 'ceilFloat', x: 3360, y: 220, w: 256, ceiling: true, oneWay: false },
+            // C1 ends at 2670. I1 at tier C0 (y: 130), gap: 60px -> x: 2730 to 2986
+            { type: 'ceilFloat', x: 2730, y: 130, w: 256, ceiling: true, oneWay: false },
+            // I2 at tier C1 (y: 220, 90px lower), gap: 60px -> x: 3046 to 3302
+            { type: 'ceilFloat', x: 3046, y: 220, w: 256, ceiling: true, oneWay: false },
+            // I3 at tier C0 (y: 130), gap: 60px -> x: 3362 to 3618
+            { type: 'ceilFloat', x: 3362, y: 130, w: 256, ceiling: true, oneWay: false },
 
             // C2: zone1_ceiling slab (x: 3668 to 4178, w: 510, tier C0 = 130)
             { type: 'ceiling', x: 3668, y: 130, w: 510, ceiling: true },
@@ -1038,12 +1041,163 @@ var GAME_LEVELS = [
         hints: [
             { triggerX: 100,  text: 'Level 8: Ceiling Runner! Enter the cavern and master twin inversions!' },
             { triggerX: 720,  text: '⚠️ TWIN SPIKES: Precision jump into the landing zone between the strips!' },
-            { triggerX: 1950, text: '🚩 CHECKPOINT 1 SAVED!' },
+            { triggerX: 1800, text: '🚩 CHECKPOINT 1 SAVED!' },
             { triggerX: 2020, text: '⬆ GRAVITY FLIP & PIT CROSSING: Invert gravity with F/FLIP to run the ceiling, or leap across the crystal islands!' },
             { triggerX: 4300, text: 'Superb balance! Watch your footing and prepare for the next inversion!' },
             { triggerX: 4700, text: '🚩 CHECKPOINT 2 SAVED!' },
             { triggerX: 4900, text: '⬆ INVERT: Press F or tap FLIP to bypass patrol saw B along the ceiling!' },
             { triggerX: 5950, text: '🚩 CHECKPOINT 3 SAVED!' }
+        ]
+    },
+
+    // ========================================================================
+    // LEVEL 9: Falling Sands (7300 px wide) - Falling Platforms, Chains & Flip Corridor
+    // ========================================================================
+    {
+        id: 9,
+        name: 'Level 9: Falling Sands',
+        worldWidth: 7300,
+        worldHeight: 720,
+        bgTint: 0xffffff,
+        playerStart: { x: 140, y: 568 },
+
+        checkpoints: [
+            // Section 5: CP1 at x: 1700 (rest area after Saw A)
+            { id: 'cp_l9_1', x: 1700, y: 600 },
+            // Section 8: CP2 at x: 3350 (rest area within 400px before Chain Pit)
+            { id: 'cp_l9_2', x: 3350, y: 600 },
+            // Section 11: CP3 at x: 4730 (rest area within 400px before Flip Zone)
+            { id: 'cp_l9_3', x: 4730, y: 600 }
+        ],
+
+        zones: [
+            // Section 12: Flip Zone F1 from x: 4900 to 5720 (width 820px)
+            {
+                id: 'fz_l9_1',
+                type: 'flipZone',
+                x: 4900,
+                y: 0,
+                width: 820,
+                height: 720
+            }
+        ],
+
+        pits: [
+            // Section 2: Intro Pit (200px wide, x: 360 to 560)
+            { x: 360, w: 200 },
+            // Section 9: Chain Pit (530px wide, x: 3650 to 4180)
+            { x: 3650, w: 530 }
+        ],
+
+        platforms: [
+            // Section 1: Start Island (x: 0 to 360, tier 600)
+            { type: 'ground', x: 0, y: 600, w: 360 },
+
+            // Section 2: Intro Pit single falling platform FP0 (x: 410 to 510, tier 510, w: 100)
+            { type: 'fallingPlatform', x: 410, y: 510, w: 100, isFalling: true },
+
+            // Section 3-8: Ground Slab 2 (x: 560 to 3650, w: 3090, tier 600)
+            { type: 'ground', x: 560, y: 600, w: 3090 },
+
+            // Section 9: Chain Pit 3 falling platforms
+            // P1: x: 3700 to 3810, tier 510, w: 110
+            { type: 'fallingPlatform', x: 3700, y: 510, w: 110, isFalling: true },
+            // P2: x: 3860 to 3970, tier 420, w: 110
+            { type: 'fallingPlatform', x: 3860, y: 420, w: 110, isFalling: true },
+            // P3: x: 4020 to 4130, tier 510, w: 110
+            { type: 'fallingPlatform', x: 4020, y: 510, w: 110, isFalling: true },
+
+            // Section 10-15: Ground Slab 3 (x: 4180 to 7300, w: 3120, tier 600)
+            { type: 'ground', x: 4180, y: 600, w: 3120 },
+
+            // Section 12: Continuous Ceiling Slab across Flip Zone (x: 4880 to 5740, w: 860, tier 130)
+            { type: 'ceiling', x: 4880, y: 130, w: 860, ceiling: true }
+        ],
+
+        telegraphedHazards: [
+            // Section 4: Saw A (patrolSaw), speed x1.0, range 160px (x: 1250 to 1410)
+            {
+                id: 'patrol_saw_9_1',
+                type: 'patrolSaw',
+                hazardType: 'saw',
+                x: 1250,
+                y: 564,
+                radius: 36,
+                axis: 'horizontal',
+                distance: 160,
+                duration: 2500
+            },
+            // Section 7: Saw B (patrolSaw), speed x1.05, range 140px (x: 2750 to 2890)
+            {
+                id: 'patrol_saw_9_2',
+                type: 'patrolSaw',
+                hazardType: 'saw',
+                x: 2750,
+                y: 564,
+                radius: 36,
+                axis: 'horizontal',
+                distance: 140,
+                duration: 2380
+            },
+            // Section 14: Saw C (patrolSaw), speed x1.1, range 180px (x: 6550 to 6730)
+            {
+                id: 'patrol_saw_9_3',
+                type: 'patrolSaw',
+                hazardType: 'saw',
+                x: 6550,
+                y: 564,
+                radius: 36,
+                axis: 'horizontal',
+                distance: 180,
+                duration: 2270
+            }
+        ],
+
+        spikes: [
+            // Section 3: S1 floor spikes (80px wide, x: 810 to 890)
+            { x: 810, y: 600, width: 80, height: 45, side: 'floor' },
+            // Section 6: S2 floor spikes (130px wide, x: 2250 to 2380)
+            { x: 2250, y: 600, width: 130, height: 45, side: 'floor' },
+            // Section 10: S3 floor spikes (55px wide, x: 4500 to 4555)
+            { x: 4500, y: 600, width: 55, height: 45, side: 'floor' },
+            // Section 12: Floor spike field under Flip Zone (300px wide, x: 5300 to 5600)
+            { x: 5300, y: 600, width: 300, height: 45, side: 'floor' },
+            // Section 13: S4 floor spikes (95px wide, x: 6150 to 6245)
+            { x: 6150, y: 600, width: 95, height: 45, side: 'floor' }
+        ],
+
+        decor: [
+            // Start Island decor rocks
+            { type: 'decor_rocks', x: 200, y: 600 },
+            // Ground rocks along safe flat stretches
+            { type: 'decor_rocks', x: 680, y: 600 },
+            { type: 'decor_rocks', x: 1050, y: 600 },
+            { type: 'decor_rocks', x: 1950, y: 600 },
+            { type: 'decor_rocks', x: 2550, y: 600 },
+            { type: 'decor_rocks', x: 3100, y: 600 },
+            { type: 'decor_rocks', x: 4350, y: 600 },
+            { type: 'decor_rocks', x: 5900, y: 600 },
+            { type: 'decor_rocks', x: 6400, y: 600 },
+            { type: 'decor_rocks', x: 6900, y: 600 },
+
+            // Hanging stalactites only above y = 130, never over pit routes, never in flip section lower area
+            { type: 'decor_stalactite', x: 200, y: 30 },
+            { type: 'decor_stalactite', x: 1000, y: 30 },
+            { type: 'decor_stalactite', x: 2000, y: 30 },
+            { type: 'decor_stalactite', x: 3000, y: 30 },
+            { type: 'decor_stalactite', x: 6000, y: 30 },
+            { type: 'decor_stalactite', x: 6800, y: 30 }
+        ],
+
+        goal: { x: 7050, y: 600 },
+
+        hints: [
+            { triggerX: 100,  text: 'Level 9: Falling Sands! Leap across the collapsing platform to cross the pit!' },
+            { triggerX: 1600, text: '🚩 CHECKPOINT 1 SAVED!' },
+            { triggerX: 3250, text: '🚩 CHECKPOINT 2 SAVED! Dangerous collapsing chain ahead — maintain your momentum!' },
+            { triggerX: 4650, text: '🚩 CHECKPOINT 3 SAVED! Invert gravity to cross the floor spike field!' },
+            { triggerX: 4850, text: '⬆ INVERT: Press F or tap FLIP to run along the ceiling!' },
+            { triggerX: 6950, text: 'Goal ahead! Final sprint to victory!' }
         ]
     }
 ];
