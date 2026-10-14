@@ -922,7 +922,7 @@ var GAME_LEVELS = [
         playerStart: { x: 140, y: 568 }, // Standard visible floor spawn
 
         checkpoints: [
-            { id: 'cp_l8_mid', x: 2300, y: 600 }, // Checkpoint 1 before Flip Section 1 & Pit
+            { id: 'cp_l8_mid', x: 1850, y: 600 }, // Checkpoint 1 before Flip Section 1 & Pit
             { id: 'cp_l8_b',   x: 4800, y: 600 }, // Checkpoint 2 before Flip Section 2
             { id: 'cp_l8_c',   x: 6050, y: 600 }  // Checkpoint 3 after Flip Section 2 before final gauntlet
         ],
@@ -955,9 +955,12 @@ var GAME_LEVELS = [
             { type: 'ceiling', x: 2030, y: 130, w: 640, ceiling: true },
 
             // Upper Floating Islands (in the upper section for ceiling/aerial route):
-            { type: 'ceilFloat', x: 2720, y: 220, w: 256, ceiling: true, oneWay: false },
-            { type: 'ceilFloat', x: 3040, y: 280, w: 256, ceiling: true, oneWay: false },
-            { type: 'ceilFloat', x: 3360, y: 220, w: 256, ceiling: true, oneWay: false },
+            // C1 ends at 2670. I1 at tier C0 (y: 130), gap: 60px -> x: 2730 to 2986
+            { type: 'ceilFloat', x: 2730, y: 130, w: 256, ceiling: true, oneWay: false },
+            // I2 at tier C1 (y: 220, 90px lower), gap: 60px -> x: 3046 to 3302
+            { type: 'ceilFloat', x: 3046, y: 220, w: 256, ceiling: true, oneWay: false },
+            // I3 at tier C0 (y: 130), gap: 60px -> x: 3362 to 3618
+            { type: 'ceilFloat', x: 3362, y: 130, w: 256, ceiling: true, oneWay: false },
 
             // C2: zone1_ceiling slab (x: 3668 to 4178, w: 510, tier C0 = 130)
             { type: 'ceiling', x: 3668, y: 130, w: 510, ceiling: true },
@@ -1038,7 +1041,7 @@ var GAME_LEVELS = [
         hints: [
             { triggerX: 100,  text: 'Level 8: Ceiling Runner! Enter the cavern and master twin inversions!' },
             { triggerX: 720,  text: '⚠️ TWIN SPIKES: Precision jump into the landing zone between the strips!' },
-            { triggerX: 1950, text: '🚩 CHECKPOINT 1 SAVED!' },
+            { triggerX: 1800, text: '🚩 CHECKPOINT 1 SAVED!' },
             { triggerX: 2020, text: '⬆ GRAVITY FLIP & PIT CROSSING: Invert gravity with F/FLIP to run the ceiling, or leap across the crystal islands!' },
             { triggerX: 4300, text: 'Superb balance! Watch your footing and prepare for the next inversion!' },
             { triggerX: 4700, text: '🚩 CHECKPOINT 2 SAVED!' },

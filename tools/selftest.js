@@ -48,3 +48,4 @@ if (warningCount > 0 || errorCount > 0) {
 } else {
     process.exit(0);
 }
+

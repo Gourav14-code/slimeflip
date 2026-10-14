@@ -518,7 +518,7 @@ function validateLevel(lvl) {
         const pitLeft = pit.x;
         const pitRight = pit.x + pit.w;
         const pitStones = (lvl.platforms || [])
-            .filter(p => p.type !== 'ground' && p.x >= pitLeft - 20 && (p.x + p.w) <= pitRight + 20)
+            .filter(p => p.type !== 'ground' && !p.ceiling && (p.ceiling === false || p.y >= 400) && p.x >= pitLeft - 20 && (p.x + p.w) <= pitRight + 20)
             .sort((a, b) => a.x - b.x);
 
         for (let i = 0; i < pitStones.length - 1; i++) {
@@ -530,6 +530,25 @@ function validateLevel(lvl) {
             }
         }
     });
+
+    // 6b. Ceiling Route Connectivity Rule (LEVEL_DESIGN.md Section 9)
+    const ceilPlats = (lvl.platforms || [])
+        .filter(p => p.type !== 'ground' && (p.ceiling || p.type === 'ceiling' || (p.y !== undefined && p.y <= 300)))
+        .sort((a, b) => a.x - b.x);
+
+    for (let i = 0; i < ceilPlats.length - 1; i++) {
+        const c1 = ceilPlats[i];
+        const c2 = ceilPlats[i + 1];
+        const norm1 = normalizePlatformData(c1);
+        const norm2 = normalizePlatformData(c2);
+        const gap = norm2.left - norm1.right;
+        if (gap >= 0 && gap <= 200) {
+            const reach = canReach(c1, c2, -1);
+            if (!reach.reachable) {
+                report.warnings.push(`Level ${lvl.id}: Ceiling route platforms at x:${c1.x} and x:${c2.x} are not reachable (${reach.reason})!`);
+            }
+        }
+    }
 
     // 7. Bounce Pad Ground Hazard Clearance Rule: No hazard inside pad center +- PAD_REACH
     allPads.forEach(bp => {
@@ -640,8 +659,10 @@ function validateLevel(lvl) {
     if (lvl.id > 1) {
         const spawnX = (lvl.playerStart && lvl.playerStart.x !== undefined) ? lvl.playerStart.x : 140;
         (lvl.pits || []).forEach(pit => {
-            const hasCover = (spawnX <= pit.x && (pit.x - spawnX) <= 400) ||
-                levelCPs.some(cp => cp.x <= pit.x && (pit.x - cp.x) <= 400);
+            const insideFZ = (lvl.zones || []).find(z => z.type === 'flipZone' && pit.x >= z.x && (pit.x + pit.w) <= (z.x + (z.width || z.w || 0)));
+            const checkEntry = insideFZ ? insideFZ.x : pit.x;
+            const hasCover = (spawnX <= checkEntry && (checkEntry - spawnX) <= 400) ||
+                levelCPs.some(cp => cp.x <= checkEntry && (checkEntry - cp.x) <= 400);
             if (!hasCover) {
                 report.warnings.push(`Level ${lvl.id}: Mandatory pit at x:${pit.x} has no checkpoint or spawn within 400px before it!`);
             }
