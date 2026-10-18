@@ -114,7 +114,7 @@ var GAME_LEVELS = [
             { type: 'decor_stalactite', x: 2120, y: 30 }
         ],
 
-        goal: { x: 3450, y: 600 },
+        goal: { x: 3300, y: 600 },
 
         hints: [
             { triggerX: 100,  text: 'Level 1: Crystal Cavern! Run with Arrow Keys or A/D, Jump with SPACE or ▲.' },
@@ -1071,47 +1071,47 @@ var GAME_LEVELS = [
         ],
 
         zones: [
-            // Section 12: Flip Zone F1 from x: 4840 to 5730 (width 890px)
+            // Section 12: Flip Zone F1 from x: 4900 to 5720 (width 820px)
             {
                 id: 'fz_l9_1',
                 type: 'flipZone',
-                x: 4840,
+                x: 4900,
                 y: 0,
-                width: 890,
+                width: 820,
                 height: 720
             }
         ],
 
         pits: [
-            // Section 2: Intro Pit (240px wide, x: 340 to 580)
-            { x: 340, w: 240 },
-            // Section 9: Chain Pit (580px wide, x: 3630 to 4210)
-            { x: 3630, w: 580 }
+            // Section 2: Intro Pit (200px wide, x: 360 to 560)
+            { x: 360, w: 200 },
+            // Section 9: Chain Pit (530px wide, x: 3650 to 4180)
+            { x: 3650, w: 530 }
         ],
 
         platforms: [
-            // Section 1: Start Island (x: 0 to 340, tier 600)
-            { type: 'ground', x: 0, y: 600, w: 340 },
+            // Section 1: Start Island (x: 0 to 360, tier 600)
+            { type: 'ground', x: 0, y: 600, w: 360 },
 
-            // Section 2: Intro Pit single falling platform FP0 (x: 410 to 510, tier 510, w: 100, gaps 70px)
+            // Section 2: Intro Pit single falling platform FP0 (x: 410 to 510, tier 510, w: 100)
             { type: 'fallingPlatform', x: 410, y: 510, w: 100, isFalling: true },
 
-            // Section 3-8: Ground Slab 2 (x: 580 to 3630, w: 3050, tier 600)
-            { type: 'ground', x: 580, y: 600, w: 3050 },
+            // Section 3-8: Ground Slab 2 (x: 560 to 3650, w: 3090, tier 600)
+            { type: 'ground', x: 560, y: 600, w: 3090 },
 
-            // Section 9: Chain Pit 3 falling platforms (tier 510 / 420 / 510, floating stepping stones, gaps 70px)
-            // P1: x: 3700 to 3800, tier 510, w: 100
-            { type: 'fallingPlatform', x: 3700, y: 510, w: 100, isFalling: true },
-            // P2: x: 3870 to 3970, tier 420, w: 100
-            { type: 'fallingPlatform', x: 3870, y: 420, w: 100, isFalling: true },
-            // P3: x: 4040 to 4140, tier 510, w: 100
-            { type: 'fallingPlatform', x: 4040, y: 510, w: 100, isFalling: true },
+            // Section 9: Chain Pit 3 falling platforms
+            // P1: x: 3700 to 3810, tier 510, w: 110
+            { type: 'fallingPlatform', x: 3700, y: 510, w: 110, isFalling: true },
+            // P2: x: 3860 to 3970, tier 420, w: 110
+            { type: 'fallingPlatform', x: 3860, y: 420, w: 110, isFalling: true },
+            // P3: x: 4020 to 4130, tier 510, w: 110
+            { type: 'fallingPlatform', x: 4020, y: 510, w: 110, isFalling: true },
 
-            // Section 10-15: Ground Slab 3 (x: 4210 to 7300, w: 3090, tier 600)
-            { type: 'ground', x: 4210, y: 600, w: 3090 },
+            // Section 10-15: Ground Slab 3 (x: 4180 to 7300, w: 3120, tier 600)
+            { type: 'ground', x: 4180, y: 600, w: 3120 },
 
-            // Section 12: Continuous Ceiling Slab across Flip Zone (x: 4820 to 5750, w: 930, tier 130)
-            { type: 'ceiling', x: 4820, y: 130, w: 930, ceiling: true }
+            // Section 12: Continuous Ceiling Slab across Flip Zone (x: 4880 to 5740, w: 860, tier 130)
+            { type: 'ceiling', x: 4880, y: 130, w: 860, ceiling: true }
         ],
 
         telegraphedHazards: [
@@ -1154,8 +1154,8 @@ var GAME_LEVELS = [
         ],
 
         spikes: [
-            // Section 3: S1 floor spikes (80px wide, x: 840 to 920, >=250px after Intro Pit)
-            { x: 840, y: 600, width: 80, height: 45, side: 'floor' },
+            // Section 3: S1 floor spikes (80px wide, x: 810 to 890)
+            { x: 810, y: 600, width: 80, height: 45, side: 'floor' },
             // Section 6: S2 floor spikes (130px wide, x: 2250 to 2380)
             { x: 2250, y: 600, width: 130, height: 45, side: 'floor' },
             // Section 10: S3 floor spikes (55px wide, x: 4500 to 4555)
@@ -1180,12 +1180,12 @@ var GAME_LEVELS = [
             { type: 'decor_rocks', x: 6400, y: 600 },
             { type: 'decor_rocks', x: 6900, y: 600 },
 
-            // Hanging stalactites: atmospheric falling + dynamic traps that rumble and drop
+            // Hanging stalactites only above y = 130, never over pit routes, never in flip section lower area
             { type: 'decor_stalactite', x: 200, y: 30 },
             { type: 'decor_stalactite', x: 1000, y: 30 },
-            { type: 'decor_stalactite', x: 2000, y: 30, trap: true, triggerX: 1940, triggerRadius: 90 },
+            { type: 'decor_stalactite', x: 2000, y: 30 },
             { type: 'decor_stalactite', x: 3000, y: 30 },
-            { type: 'decor_stalactite', x: 6000, y: 30, trap: true, triggerX: 5920, triggerRadius: 90 },
+            { type: 'decor_stalactite', x: 6000, y: 30 },
             { type: 'decor_stalactite', x: 6800, y: 30 }
         ],
 
@@ -1196,7 +1196,7 @@ var GAME_LEVELS = [
             { triggerX: 1600, text: '🚩 CHECKPOINT 1 SAVED!' },
             { triggerX: 3250, text: '🚩 CHECKPOINT 2 SAVED! Dangerous collapsing chain ahead — maintain your momentum!' },
             { triggerX: 4650, text: '🚩 CHECKPOINT 3 SAVED! Invert gravity to cross the floor spike field!' },
-            { triggerX: 4850, text: '⬆ INVERT: Press UP (▲) or tap FLIP to run along the ceiling!' },
+            { triggerX: 4850, text: '⬆ INVERT: Press F or tap FLIP to run along the ceiling!' },
             { triggerX: 6950, text: 'Goal ahead! Final sprint to victory!' }
         ]
     }

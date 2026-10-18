@@ -75,8 +75,29 @@ var ANIM = {
     GEM_POP_DURATION: 150          // ms
 };
 
+// Calibrated Black Hole Goal Vortex Constants (Exact flag size silhouette: 60x95px)
+var ANIM_GOAL = {
+    WIDTH: 60,
+    HEIGHT: 95,
+    HOLE_OFFSET_Y: -5,             // Offset from center to black hole core center (~45% from top)
+    BREATH_SCALE_MIN: 0.98,
+    BREATH_SCALE_MAX: 1.03,
+    BREATH_DURATION: 1800,         // ms
+    SWIRL_WIDTH: 52,
+    SWIRL_HEIGHT: 62,
+    SWIRL_ROT_SPEED: 60,           // deg/sec
+    SWIRL_ALPHA: 0.55,
+    CORE_WIDTH: 22,
+    CORE_HEIGHT: 26,
+    PULL_RADIUS: 180,
+    PULL_MAX_TILT: 8,              // max degrees slime tilts toward hole
+    TRIGGER_DIST_X: 35,
+    ENTER_DURATION: 1250           // ms
+};
+
 if (typeof window !== 'undefined') {
     window.ANIM = ANIM;
+    window.ANIM_GOAL = ANIM_GOAL;
 }
 
 // Debug setting: Set to false by default (no on-screen debug outlines)
@@ -173,7 +194,7 @@ function normalizePlatformData(p) {
 function validateLevel(lvl) {
     const report = { warnings: [], autoFixed: [], reachablePairs: 0, totalPairs: 0, gapRows: [] };
 
-    const isFpType = (t) => ['fallingPlatform', 'stoneCube', 'darkStoneCube', 'stone_cube', 'dark_stone_cube'].includes(t);
+    const isFpType = (t) => ['fallingPlatform', 'stoneCube', 'darkStoneCube', 'stone_cube', 'dark_stone_cube', 'vanishingRoad'].includes(t);
 
     const rawPlatforms = [
         ...(lvl.platforms || []),
@@ -2134,6 +2155,7 @@ class GameScene extends Phaser.Scene {
         this.load.image('bounce_pad_down', 'assets/zone1/bounce_pad_down.png');
         this.load.image('checkpoint_flag', 'assets/zone1/checkpoint_flag.png');
         this.load.image('goal_flag', 'assets/zone1/goal_flag.png');
+        this.load.image('goal_vortex_tall', 'assets/zone1/goal_vortex_tall.png');
         this.load.image('obs_turret', 'assets/zone1/obs_turret.png');
         this.load.image('obs_bullet', 'assets/zone1/obs_bullet.png');
         this.load.image('obs_conveyor', 'assets/zone1/obs_conveyor.png');
@@ -2288,6 +2310,75 @@ class GameScene extends Phaser.Scene {
             ctx.fill();
             canvas.refresh();
         }
+
+        if (!this.textures.exists('goal_vortex_tall')) {
+            const canvas = this.textures.createCanvas('goal_vortex_tall', 60, 95);
+            if (canvas) {
+                const ctx = canvas.getContext();
+                ctx.fillStyle = '#0a0515';
+                ctx.beginPath();
+                ctx.ellipse(30, 47, 26, 42, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#a855f7';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                canvas.refresh();
+            }
+        }
+
+        if (!this.textures.exists('goal_spiral_tex')) {
+            const canvas = this.textures.createCanvas('goal_spiral_tex', 128, 128);
+            if (canvas) {
+                const ctx = canvas.getContext();
+                const cx = 64, cy = 64;
+                for (let arm = 0; arm < 3; arm++) {
+                    const baseAngle = arm * ((Math.PI * 2) / 3);
+                    ctx.beginPath();
+                    for (let r = 4; r < 58; r += 1.5) {
+                        const theta = baseAngle + r * 0.14;
+                        const x = cx + r * Math.cos(theta);
+                        const y = cy + r * Math.sin(theta);
+                        if (r === 4) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    const grad = ctx.createLinearGradient(0, 0, 128, 128);
+                    grad.addColorStop(0, 'rgba(168, 85, 247, 0.9)');
+                    grad.addColorStop(0.5, 'rgba(56, 239, 125, 0.9)');
+                    grad.addColorStop(1, 'rgba(236, 72, 153, 0.8)');
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = 4;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                }
+                ctx.globalCompositeOperation = 'destination-in';
+                const radGrad = ctx.createRadialGradient(cx, cy, 30, cx, cy, 62);
+                radGrad.addColorStop(0, 'rgba(0,0,0,1)');
+                radGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = radGrad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 62, 0, Math.PI * 2);
+                ctx.fill();
+                canvas.refresh();
+            }
+        }
+
+        if (!this.textures.exists('goal_core_tex')) {
+            const canvas = this.textures.createCanvas('goal_core_tex', 64, 64);
+            if (canvas) {
+                const ctx = canvas.getContext();
+                const cx = 32, cy = 32;
+                const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, 30);
+                grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+                grad.addColorStop(0.7, 'rgba(5, 5, 15, 0.95)');
+                grad.addColorStop(0.85, 'rgba(168, 85, 247, 0.5)');
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+                ctx.fill();
+                canvas.refresh();
+            }
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -2339,6 +2430,13 @@ class GameScene extends Phaser.Scene {
         if (this.spikes) this.spikes.clear(true, true);
         if (this.checkpointsGroup) this.checkpointsGroup.clear(true, true);
         if (this.goal) { this.goal.destroy(); this.goal = null; }
+        if (this.goalVortexGroup) { this.goalVortexGroup.clear(true, true); this.goalVortexGroup.destroy(true); this.goalVortexGroup = null; }
+        this.goalParticles = [];
+        this.goalSwirl1 = null;
+        this.goalSwirl2 = null;
+        this.goalCore = null;
+        this.isVortexGoal = false;
+        this.levelCompleted = false;
         if (this.player) { this.player.destroy(); this.player = null; }
         if (this.zoneGraphics) { this.zoneGraphics.destroy(); this.zoneGraphics = null; }
         if (this.bg) { this.bg.destroy(); this.bg = null; }
@@ -2362,9 +2460,44 @@ class GameScene extends Phaser.Scene {
         this.physics.world.gravity.y = PLAYER.GRAVITY;
         this.respawnGraceTimer = this.time.now + 1000;
 
-        const levelData = (typeof GAME_LEVELS !== 'undefined' && GAME_LEVELS[levelIndex])
+        const rawLevel = (typeof GAME_LEVELS !== 'undefined' && GAME_LEVELS[levelIndex])
             ? GAME_LEVELS[levelIndex]
             : GAME_LEVELS[0];
+
+        // Deep copy levelData for this session so we can inject Level 1 trolls without mutating static GAME_LEVELS
+        let levelData = JSON.parse(JSON.stringify(rawLevel));
+
+        if (levelIndex === 0) {
+            // 1. "Bhaagte-bhaagte zameen gayab" (The Vanishing Road Trap, x: 1400 se 1520)
+            const g0 = levelData.platforms.find(p => p.type === 'ground' && p.x === 0 && p.w === 1800);
+            if (g0) {
+                const idx = levelData.platforms.indexOf(g0);
+                levelData.platforms.splice(idx, 1,
+                    { type: 'ground', x: 0, y: 600, w: 1400 },
+                    { type: 'vanishingRoad', x: 1400, y: 600, w: 120, triggerDist: 80 },
+                    { type: 'ground', x: 1520, y: 600, w: 280 }
+                );
+            }
+
+            // 2. "Kabhi up, kabhi neeche" (Shifting Platform Trap at Air Stairs Tier 3 x: 1075, y: 330)
+            const stair2 = levelData.platforms.find(p => p.x === 1075 && p.y === 330);
+            if (stair2) {
+                stair2.troll = 'shiftDown';
+                stair2.triggerX = 960;
+            }
+
+            // 3. "Bait karo, platform wapis aayega" (The Reappearing Stone in Pit x: 1800 se 1900)
+            levelData.platforms.push({
+                type: 'reappearingPlatform',
+                x: 1815,
+                y: 600,
+                w: 70,
+                triggerDist: 90
+            });
+
+            // 4. Runaway Goal Flag at x: 3300
+            levelData.goal = { x: 3300, y: 600 };
+        }
 
         this.levelData = levelData;
 
@@ -2474,24 +2607,103 @@ class GameScene extends Phaser.Scene {
             });
         }
 
-        // 9. Goal Flag
+        // 9. Goal (Animated Black Hole Vortex for Level 1, matching flag size 60x95)
+        const isVortexGoal = (this.currentLevelIndex === 0);
+        this.isVortexGoal = isVortexGoal;
         const goalPos = levelData.goal || { x: worldW - 150, y: GROUND_TOP_Y };
-        const goalFlagY = (goalPos.y || GROUND_TOP_Y) - 47;
-        this.goal = this.physics.add.sprite(goalPos.x, goalFlagY, 'goal_flag');
-        this.goal.setDisplaySize(60, 95);
+        const groundTop = goalPos.y || GROUND_TOP_Y;
+        const goalFlagY = groundTop - (ANIM_GOAL.HEIGHT / 2); // 600 - 47.5 = 552.5, resting flush on ground
+        const goalTex = isVortexGoal ? (this.textures.exists('goal_vortex_tall') ? 'goal_vortex_tall' : 'goal_flag') : 'goal_flag';
+
+        this.goal = this.physics.add.sprite(goalPos.x, goalFlagY, goalTex);
+        this.goal.setDisplaySize(ANIM_GOAL.WIDTH, ANIM_GOAL.HEIGHT);
+        this.goal.setDepth(5);
         this.goal.body.setAllowGravity(false);
         this.goal.body.setImmovable(true);
-        this.goal.body.setSize(this.goal.width * (24 / 60), this.goal.height * (60 / 95), true);
+        this.goal.body.setSize(ANIM_GOAL.WIDTH * (24 / 60), ANIM_GOAL.HEIGHT * (60 / 95), true);
         this.goal.refreshBody();
+        this.goal.origGoalX = goalPos.x;
+        this.goal.hasEscaped = false;
+        this.goal.isVortex = isVortexGoal;
 
-        this.tweens.add({
-            targets: this.goal,
-            y: goalFlagY - 8,
-            duration: 1200,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
+        if (isVortexGoal) {
+            const holeX = goalPos.x;
+            const holeY = goalFlagY + ANIM_GOAL.HOLE_OFFSET_Y;
+            this.goalHoleX = holeX;
+            this.goalHoleY = holeY;
+
+            this.goalVortexGroup = this.add.group();
+
+            // Layer a: Backdrop breathing tween
+            this.tweens.add({
+                targets: this.goal,
+                scaleX: { from: this.goal.scaleX * ANIM_GOAL.BREATH_SCALE_MIN, to: this.goal.scaleX * ANIM_GOAL.BREATH_SCALE_MAX },
+                scaleY: { from: this.goal.scaleY * ANIM_GOAL.BREATH_SCALE_MIN, to: this.goal.scaleY * ANIM_GOAL.BREATH_SCALE_MAX },
+                duration: ANIM_GOAL.BREATH_DURATION,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+
+            // Layer b: Swirl overlays
+            if (this.textures.exists('goal_spiral_tex')) {
+                this.goalSwirl1 = this.add.image(holeX, holeY, 'goal_spiral_tex')
+                    .setDisplaySize(ANIM_GOAL.SWIRL_WIDTH, ANIM_GOAL.SWIRL_HEIGHT)
+                    .setBlendMode(Phaser.BlendModes.ADD)
+                    .setAlpha(ANIM_GOAL.SWIRL_ALPHA)
+                    .setDepth(6);
+                this.goalVortexGroup.add(this.goalSwirl1);
+
+                this.goalSwirl2 = this.add.image(holeX, holeY, 'goal_spiral_tex')
+                    .setDisplaySize(ANIM_GOAL.SWIRL_WIDTH * 0.85, ANIM_GOAL.SWIRL_HEIGHT * 0.85)
+                    .setBlendMode(Phaser.BlendModes.ADD)
+                    .setAlpha(ANIM_GOAL.SWIRL_ALPHA * 0.5)
+                    .setDepth(6);
+                this.goalVortexGroup.add(this.goalSwirl2);
+            }
+
+            // Layer c: Inward streaming pooled particles
+            this.goalParticles = [];
+            const particleColors = [0xa855f7, 0x00f2fe, 0xec4899, 0x38ef7d];
+            for (let i = 0; i < 16; i++) {
+                const color = particleColors[i % particleColors.length];
+                const dot = this.add.circle(holeX, holeY, 1.8, color, 0.85).setDepth(6);
+                this.goalVortexGroup.add(dot);
+                this.goalParticles.push({
+                    sprite: dot,
+                    radius: 12 + Math.random() * 20,
+                    angle: (i / 16) * Math.PI * 2 + Math.random() * 0.5,
+                    speed: 1.8 + Math.random() * 1.2
+                });
+            }
+
+            // Layer d: Core
+            if (this.textures.exists('goal_core_tex')) {
+                this.goalCore = this.add.image(holeX, holeY, 'goal_core_tex')
+                    .setDisplaySize(ANIM_GOAL.CORE_WIDTH, ANIM_GOAL.CORE_HEIGHT)
+                    .setDepth(7);
+                this.goalVortexGroup.add(this.goalCore);
+
+                this.tweens.add({
+                    targets: this.goalCore,
+                    scaleX: { from: this.goalCore.scaleX * 0.94, to: this.goalCore.scaleX * 1.08 },
+                    scaleY: { from: this.goalCore.scaleY * 0.94, to: this.goalCore.scaleY * 1.08 },
+                    duration: 1300,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            }
+        } else {
+            this.tweens.add({
+                targets: this.goal,
+                y: goalFlagY - 8,
+                duration: 1200,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
 
         // 10. Player Slime Spawn
         const spawnX = this.currentCheckpoint ? this.currentCheckpoint.x : (levelData.playerStart ? levelData.playerStart.x : 140);
@@ -2716,6 +2928,205 @@ class GameScene extends Phaser.Scene {
                 slabCollider.walkLeft = walkLeft;
                 slabCollider.walkRight = walkRight;
 
+            } else if (typeKey === 'vanishingRoad') {
+                // LEVEL DEVIL TROLL: The road chunk looks 100% normal, but vanishes under the running player!
+                const tileH = 64;
+                const fillH = 720 - walkTop;
+
+                const tile = this.add.image(centerX, walkTop + tileH / 2 - 2, 'zone1_ground_long');
+                tile.setDisplaySize(w, tileH);
+                tile.setDepth(3);
+                this.platformVisualsGroup.add(tile);
+
+                const rockFill = this.add.rectangle(centerX, walkTop + fillH / 2, w, fillH, 0x141024);
+                rockFill.setDepth(2);
+                this.platformVisualsGroup.add(rockFill);
+
+                const slabCollider = this.solidPlatforms.create(centerX, walkTop + fillH / 2, 'dummy_col');
+                slabCollider.setVisible(false);
+                slabCollider.setDisplaySize(w, fillH);
+                slabCollider.refreshBody();
+                slabCollider.walkTop = walkTop;
+                slabCollider.walkLeft = walkLeft;
+                slabCollider.walkRight = walkRight;
+
+                const triggerDist = p.triggerDist || 80;
+                const roadCtrl = {
+                    hasTriggered: false,
+                    update: () => {
+                        if (roadCtrl.hasTriggered || this.isDead || this.hasWon) return;
+                        const px = this.player.x;
+                        if (px >= walkLeft - triggerDist && px <= walkRight + 20) {
+                            roadCtrl.hasTriggered = true;
+                            if (typeof soundManager !== 'undefined' && soundManager.playWarning) {
+                                soundManager.playWarning();
+                            }
+                            if (this.cameras && this.cameras.main) {
+                                this.cameras.main.shake(120, 0.005);
+                            }
+                            tile.setTint(0xff6666);
+                            this.tweens.add({
+                                targets: [tile, rockFill],
+                                x: centerX + 4,
+                                duration: 25,
+                                yoyo: true,
+                                repeat: 4,
+                                onComplete: () => {
+                                    this.time.delayedCall(50, () => {
+                                        if (slabCollider.body) {
+                                            slabCollider.body.checkCollision.up = false;
+                                            slabCollider.body.checkCollision.left = false;
+                                            slabCollider.body.checkCollision.right = false;
+                                            slabCollider.body.checkCollision.down = false;
+                                        }
+                                    });
+                                    this.tweens.add({
+                                        targets: [tile, rockFill],
+                                        y: '+=500',
+                                        alpha: 0,
+                                        duration: 450,
+                                        ease: 'Quad.easeIn',
+                                        onComplete: () => {
+                                            tile.setVisible(false);
+                                            rockFill.setVisible(false);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    },
+                    reset: () => {
+                        roadCtrl.hasTriggered = false;
+                        this.tweens.killTweensOf(tile);
+                        this.tweens.killTweensOf(rockFill);
+                        tile.setPosition(centerX, walkTop + tileH / 2 - 2);
+                        tile.setAlpha(1);
+                        tile.setVisible(true);
+                        tile.clearTint();
+                        rockFill.setPosition(centerX, walkTop + fillH / 2);
+                        rockFill.setAlpha(1);
+                        rockFill.setVisible(true);
+                        if (slabCollider.body) {
+                            slabCollider.body.checkCollision.up = true;
+                            slabCollider.body.checkCollision.left = true;
+                            slabCollider.body.checkCollision.right = true;
+                            slabCollider.body.checkCollision.down = true;
+                            slabCollider.refreshBody();
+                        }
+                    }
+                };
+                this.activeHazardControllers.push(roadCtrl);
+
+            } else if (typeKey === 'reappearingPlatform') {
+                // LEVEL DEVIL TROLL 3: The Reappearing Stone in Pit!
+                // Drops into abyss when player approaches. If player baits it, rises back up after 1.2s and becomes solid!
+                const cubeTex = 'zone1_plat_tiny';
+                const dispW = w;
+                const dispH = 32;
+                const origImgY = walkTop + dispH / 2;
+
+                const sprite = this.add.image(centerX, origImgY, cubeTex);
+                sprite.setDisplaySize(dispW, dispH);
+                sprite.setDepth(4);
+                this.platformVisualsGroup.add(sprite);
+
+                const colBody = this.solidPlatforms.create(centerX, origImgY, 'dummy_col');
+                colBody.setVisible(false);
+                colBody.setDisplaySize(dispW, dispH);
+                colBody.refreshBody();
+                colBody.walkTop = walkTop;
+                colBody.walkLeft = walkLeft;
+                colBody.walkRight = walkRight;
+
+                const triggerDist = p.triggerDist || 90;
+                const reappearingCtrl = {
+                    hasDropped: false,
+                    hasRestored: false,
+                    update: () => {
+                        if (this.isDead || this.hasWon) return;
+                        const px = this.player.x;
+                        if (!reappearingCtrl.hasDropped && px >= walkLeft - triggerDist && px <= walkRight + 40) {
+                            reappearingCtrl.hasDropped = true;
+                            if (typeof soundManager !== 'undefined' && soundManager.playWarning) {
+                                soundManager.playWarning();
+                            }
+                            if (this.cameras && this.cameras.main) {
+                                this.cameras.main.shake(120, 0.006);
+                            }
+                            sprite.setTint(0xff5555);
+                            this.tweens.add({
+                                targets: sprite,
+                                x: centerX + 4,
+                                duration: 25,
+                                yoyo: true,
+                                repeat: 3,
+                                onComplete: () => {
+                                    sprite.clearTint();
+                                    if (colBody.body) {
+                                        colBody.body.checkCollision.up = false;
+                                        colBody.body.checkCollision.left = false;
+                                        colBody.body.checkCollision.right = false;
+                                        colBody.body.checkCollision.down = false;
+                                    }
+                                    this.tweens.add({
+                                        targets: sprite,
+                                        y: origImgY + 450,
+                                        alpha: 0.2,
+                                        duration: 400,
+                                        ease: 'Quad.easeIn',
+                                        onComplete: () => {
+                                            // Bait delay: 1.2s later, rises back up from abyss and becomes solid!
+                                            this.time.delayedCall(1200, () => {
+                                                if (this.isDead || this.hasWon) return;
+                                                reappearingCtrl.hasRestored = true;
+                                                sprite.setAlpha(1);
+                                                sprite.setTint(0x38ef7d);
+                                                this.tweens.add({
+                                                    targets: sprite,
+                                                    y: origImgY,
+                                                    duration: 450,
+                                                    ease: 'Back.easeOut',
+                                                    onComplete: () => {
+                                                        sprite.clearTint();
+                                                        if (typeof soundManager !== 'undefined' && soundManager.playLand) {
+                                                            soundManager.playLand();
+                                                        }
+                                                        if (colBody.body) {
+                                                            colBody.body.checkCollision.up = true;
+                                                            colBody.body.checkCollision.left = true;
+                                                            colBody.body.checkCollision.right = true;
+                                                            colBody.body.checkCollision.down = true;
+                                                            colBody.y = origImgY;
+                                                            colBody.refreshBody();
+                                                        }
+                                                    }
+                                                });
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    },
+                    reset: () => {
+                        reappearingCtrl.hasDropped = false;
+                        reappearingCtrl.hasRestored = false;
+                        this.tweens.killTweensOf(sprite);
+                        sprite.setPosition(centerX, origImgY);
+                        sprite.setAlpha(1);
+                        sprite.clearTint();
+                        if (colBody.body) {
+                            colBody.body.checkCollision.up = true;
+                            colBody.body.checkCollision.left = true;
+                            colBody.body.checkCollision.right = true;
+                            colBody.body.checkCollision.down = true;
+                            colBody.y = origImgY;
+                            colBody.refreshBody();
+                        }
+                    }
+                };
+                this.activeHazardControllers.push(reappearingCtrl);
+
             } else if (['fallingPlatform', 'stoneCube', 'darkStoneCube', 'stone_cube', 'dark_stone_cube'].includes(typeKey)) {
                 this.createFallingPlatform({
                     x: walkLeft,
@@ -2750,6 +3161,7 @@ class GameScene extends Phaser.Scene {
 
                 const isOneWay = p.oneWay !== undefined ? p.oneWay : (meta.oneWay !== false);
 
+                let createdCollider = null;
                 if (isOneWay && !isCeil) {
                     // Solid from ALL sides: player cannot jump through or pass through the platform
                     const solidH = Math.min(dispH, meta.designThickness || 56);
@@ -2762,6 +3174,7 @@ class GameScene extends Phaser.Scene {
                     solidSlab.walkLeft = walkLeft;
                     solidSlab.walkRight = walkRight;
                     solidSlab.isCeiling = false;
+                    createdCollider = solidSlab;
                 } else if (isOneWay && isCeil) {
                     // Ceiling one-way slab (blocks only from below when flipped)
                     const slabY = walkTop - 12;
@@ -2777,6 +3190,7 @@ class GameScene extends Phaser.Scene {
                     oneWaySlab.body.checkCollision.left = false;
                     oneWaySlab.body.checkCollision.right = false;
                     oneWaySlab.body.checkCollision.down = true;
+                    createdCollider = oneWaySlab;
                 } else {
                     // Full solid collider: player hits head from below and cannot cross
                     const solidH = Math.min(dispH, meta.designThickness || 56);
@@ -2789,6 +3203,75 @@ class GameScene extends Phaser.Scene {
                     solidSlab.walkLeft = walkLeft;
                     solidSlab.walkRight = walkRight;
                     solidSlab.isCeiling = isCeil;
+                    createdCollider = solidSlab;
+                }
+
+                // LEVEL DEVIL TROLL: Shifting Up/Down Platform (Mind-Bender!)
+                if (p.troll && createdCollider) {
+                    const origSpriteY = imgCenterY;
+                    const origColY = createdCollider.y;
+                    const origWalkTop = walkTop;
+                    const shiftDelta = (p.troll === 'shiftDown') ? 100 : -80;
+                    const triggerX = p.triggerX || (walkLeft - 70);
+
+                    const shiftCtrl = {
+                        hasTriggered: false,
+                        update: () => {
+                            if (shiftCtrl.hasTriggered || this.isDead || this.hasWon) return;
+                            const px = this.player.x;
+                            if (px >= triggerX && px <= walkRight + 40) {
+                                shiftCtrl.hasTriggered = true;
+                                if (typeof soundManager !== 'undefined' && soundManager.playWarning) {
+                                    soundManager.playWarning();
+                                }
+                                if (this.cameras && this.cameras.main) {
+                                    this.cameras.main.shake(120, 0.005);
+                                }
+                                sprite.setTint(0xff8888);
+                                this.tweens.add({
+                                    targets: sprite,
+                                    x: imgCenterX + 5,
+                                    duration: 20,
+                                    yoyo: true,
+                                    repeat: 3,
+                                    onComplete: () => {
+                                        sprite.clearTint();
+                                        this.tweens.add({
+                                            targets: sprite,
+                                            y: origSpriteY + shiftDelta,
+                                            duration: 200,
+                                            ease: 'Back.easeOut'
+                                        });
+                                        this.tweens.add({
+                                            targets: createdCollider,
+                                            y: origColY + shiftDelta,
+                                            duration: 200,
+                                            ease: 'Back.easeOut',
+                                            onUpdate: () => {
+                                                createdCollider.walkTop = origWalkTop + shiftDelta;
+                                                createdCollider.refreshBody();
+                                            },
+                                            onComplete: () => {
+                                                createdCollider.walkTop = origWalkTop + shiftDelta;
+                                                createdCollider.refreshBody();
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        },
+                        reset: () => {
+                            shiftCtrl.hasTriggered = false;
+                            this.tweens.killTweensOf(sprite);
+                            this.tweens.killTweensOf(createdCollider);
+                            sprite.setPosition(imgCenterX, origSpriteY);
+                            sprite.clearTint();
+                            createdCollider.setPosition(centerX, origColY);
+                            createdCollider.walkTop = origWalkTop;
+                            createdCollider.refreshBody();
+                        }
+                    };
+                    this.activeHazardControllers.push(shiftCtrl);
                 }
 
             } else if (typeKey === 'pillar' || typeKey === 'wall') {
@@ -3579,24 +4062,92 @@ class GameScene extends Phaser.Scene {
 
     triggerFallingPlatform(plat) {
         if (!plat || !plat.active) return;
-        if (plat._landingAnimActive) return;
+        if (plat.state === 'shaking' || plat.state === 'falling' || plat.state === 'fallen' || plat.state === 'reappeared') return;
+        plat.state = 'shaking';
         plat._landingAnimActive = true;
 
-        if (typeof soundManager !== 'undefined' && soundManager.playStep) {
-            soundManager.playStep();
+        if (typeof soundManager !== 'undefined' && soundManager.playWarning) {
+            soundManager.playWarning();
         }
 
-        // Subtle micro-thud on landing - platform stays rock-solid ground!
+        // Camera micro-rumble
+        if (this.cameras && this.cameras.main) {
+            this.cameras.main.shake(120, 0.005);
+        }
+
+        // Flash warning tint on visual stone sprite
+        if (plat.sprite) {
+            plat.sprite.setTint(0xff6b6b);
+        }
+
+        // Phase 1: Rapid 120ms Jitter/Shake before plunging
         this.tweens.add({
             targets: plat.sprite,
-            y: plat.originalY + 2,
-            duration: 40,
+            x: plat.originalX + 4,
+            duration: 25,
             yoyo: true,
-            ease: 'Sine.easeOut',
+            repeat: 4,
+            ease: 'Sine.easeInOut',
             onComplete: () => {
-                if (plat.sprite) plat.sprite.setPosition(plat.originalX, plat.originalY);
-                this.time.delayedCall(250, () => {
-                    plat._landingAnimActive = false;
+                if (!plat.active) return;
+                plat.state = 'falling';
+
+                // Phase 2: Plunge down into the abyss!
+                // Disable upward solid collision so player falls through into the pit!
+                this.time.delayedCall(60, () => {
+                    if (plat.body) {
+                        plat.body.checkCollision.up = false;
+                        plat.body.checkCollision.left = false;
+                        plat.body.checkCollision.right = false;
+                        plat.body.checkCollision.down = false;
+                    }
+                });
+
+                this.tweens.add({
+                    targets: plat.sprite,
+                    y: plat.originalY + 550,
+                    alpha: 0,
+                    duration: 500,
+                    ease: 'Quad.easeIn',
+                    onComplete: () => {
+                        plat.state = 'fallen';
+                        if (plat.sprite) plat.sprite.setVisible(false);
+
+                        // Phase 3: LEVEL DEVIL REAPPEAR!
+                        // If player baited the drop and stepped back, platform rises back up from the abyss!
+                        this.time.delayedCall(1200, () => {
+                            if (!plat.active || this.isDead || this.hasWon) return;
+                            if (plat.sprite) {
+                                plat.sprite.setVisible(true);
+                                plat.sprite.clearTint();
+                                plat.sprite.setAlpha(0.7);
+                                plat.sprite.setPosition(plat.originalX, plat.originalY + 200);
+                            }
+
+                            if (typeof soundManager !== 'undefined' && soundManager.playLand) {
+                                soundManager.playLand();
+                            }
+
+                            this.tweens.add({
+                                targets: plat.sprite,
+                                y: plat.originalY,
+                                alpha: 1.0,
+                                duration: 400,
+                                ease: 'Back.easeOut',
+                                onComplete: () => {
+                                    plat.state = 'reappeared';
+                                    plat._landingAnimActive = false;
+                                    if (plat.body) {
+                                        plat.body.checkCollision.up = true;
+                                        plat.body.checkCollision.left = true;
+                                        plat.body.checkCollision.right = true;
+                                        plat.body.checkCollision.down = true;
+                                        plat.refreshBody();
+                                    }
+                                }
+                            });
+                        });
+                    }
                 });
             }
         });
@@ -3941,6 +4492,22 @@ class GameScene extends Phaser.Scene {
                     s.hasTriggered = false;
                 }
             });
+        }
+        if (this.goal && this.goal.origGoalX) {
+            this.tweens.killTweensOf(this.goal);
+            this.goal.hasEscaped = false;
+            this.goal.x = this.goal.origGoalX;
+            const groundTop = (this.levelData.goal && this.levelData.goal.y) ? this.levelData.goal.y : GROUND_TOP_Y;
+            const landY = groundTop - (this.goal.displayHeight / 2);
+            this.goal.y = landY;
+            if (this.goal.refreshBody) this.goal.refreshBody();
+            this.goalHoleX = this.goal.origGoalX;
+            this.goalHoleY = landY + (ANIM_GOAL.HOLE_OFFSET_Y || -5);
+            if (this.goalSwirl1) {
+                this.goalSwirl1.x = this.goal.origGoalX;
+                this.goalSwirl2.x = this.goal.origGoalX;
+                this.goalCore.x = this.goal.origGoalX;
+            }
         }
     }
 
@@ -4344,6 +4911,130 @@ class GameScene extends Phaser.Scene {
             });
         }
 
+        // ====================================================================
+        // LEVEL DEVIL TROLL MECHANICS
+        // ====================================================================
+        // 1. Falling Platform Leap-Bait: If player jumps near/above a falling stone
+        if (this.fallingPlatformsGroup && this.player && !this.isDead && !this.hasWon) {
+            const px = this.player.x;
+            const py = this.player.y;
+            this.fallingPlatformsGroup.getChildren().forEach(plat => {
+                if (plat && plat.isFallingPlatform && plat.state === 'stable') {
+                    const distHoriz = Math.abs(px - plat.centerX);
+                    const isApproaching = distHoriz < (plat.walkWidth / 2 + 40) && (py >= plat.walkTop - 110 && py <= plat.walkTop + 30);
+                    if (isApproaching && !isGrounded) {
+                        this.triggerFallingPlatform(plat);
+                    }
+                }
+            });
+        }
+
+        // 4. The Real Runaway Flag: Leap forward 220px on an arc, permanent forward relocation!
+        if (this.goal && !this.goal.hasEscaped && !this.isDead && !this.hasWon) {
+            const distToGoal = this.goal.x - this.player.x;
+            if (distToGoal > 0 && distToGoal < 160) {
+                this.goal.hasEscaped = true;
+                if (typeof soundManager !== 'undefined' && soundManager.playBounce) {
+                    soundManager.playBounce();
+                }
+                const uiScene = this.getUIScene();
+                if (uiScene && uiScene.showTutorialHint) {
+                    uiScene.showTutorialHint("NOT SO FAST! 😈 Catch me!");
+                }
+                const targetGoalX = Math.min(this.goal.x + 220, (this.levelData.worldWidth || 3600) - 80);
+                const groundTop = (this.levelData.goal && this.levelData.goal.y) ? this.levelData.goal.y : GROUND_TOP_Y;
+                const landY = groundTop - (this.goal.displayHeight / 2);
+
+                // Permanent forward translation on X (NO yoyo on X!)
+                this.tweens.add({
+                    targets: this.goal,
+                    x: targetGoalX,
+                    duration: 380,
+                    ease: 'Quad.easeOut',
+                    onUpdate: () => {
+                        if (this.goal && this.goal.body) this.goal.refreshBody();
+                        if (this.goalHoleX !== undefined) this.goalHoleX = this.goal.x;
+                    },
+                    onComplete: () => {
+                        if (this.goal && this.goal.body) this.goal.refreshBody();
+                        if (this.goalHoleX !== undefined) this.goalHoleX = this.goal.x;
+                    }
+                });
+
+                // Arc jump in Y (jump up 65px and land back down at landY)
+                this.tweens.add({
+                    targets: this.goal,
+                    y: landY - 65,
+                    duration: 190,
+                    yoyo: true,
+                    ease: 'Sine.easeOut',
+                    onComplete: () => {
+                        if (this.goal) {
+                            this.goal.y = landY;
+                            if (this.goal.body) this.goal.refreshBody();
+                            if (this.goalHoleY !== undefined) this.goalHoleY = landY + (ANIM_GOAL.HOLE_OFFSET_Y || -5);
+                        }
+                    }
+                });
+
+                // Move visual vortex layers along with goal if vortex
+                if (this.goalSwirl1) {
+                    this.tweens.add({
+                        targets: [this.goalSwirl1, this.goalSwirl2, this.goalCore],
+                        x: targetGoalX,
+                        duration: 380,
+                        ease: 'Quad.easeOut'
+                    });
+                }
+            }
+        }
+
+        // Vortex Goal Idle Animation & Pull Feel
+        if (this.isVortexGoal && this.goal && this.player && !this.isDead) {
+            const dt = 1 / 60;
+            const hx = this.goalHoleX || this.goal.x;
+            const hy = this.goalHoleY || this.goal.y;
+            const dx = hx - this.player.x;
+            const dy = hy - this.player.y;
+            const distToHole = Math.sqrt(dx * dx + dy * dy);
+
+            const pullFactor = Math.max(0, 1 - distToHole / ANIM_GOAL.PULL_RADIUS);
+            const speedMultiplier = 1.0 + (pullFactor * 0.8);
+
+            // Rotate swirl layers
+            if (this.goalSwirl1) {
+                this.goalSwirl1.rotation += Phaser.Math.DegToRad(ANIM_GOAL.SWIRL_ROT_SPEED * speedMultiplier) * dt;
+            }
+            if (this.goalSwirl2) {
+                this.goalSwirl2.rotation -= Phaser.Math.DegToRad((ANIM_GOAL.SWIRL_ROT_SPEED * 0.45) * speedMultiplier) * dt;
+            }
+
+            // Inward spiral particles
+            if (this.goalParticles && this.goalParticles.length > 0) {
+                for (let i = 0; i < this.goalParticles.length; i++) {
+                    const p = this.goalParticles[i];
+                    p.radius -= (p.speed * 8 * speedMultiplier) * dt;
+                    p.angle += ((p.speed * 2.5 * speedMultiplier) / Math.max(p.radius, 5)) * dt;
+                    if (p.radius <= 3) {
+                        p.radius = 24 + Math.random() * 8;
+                        p.angle = Math.random() * Math.PI * 2;
+                    }
+                    const px = hx + Math.cos(p.angle) * p.radius;
+                    const py = hy + Math.sin(p.angle) * (p.radius * 1.22);
+                    p.sprite.setPosition(px, py);
+                    p.sprite.setAlpha(Math.min(0.85, (p.radius / 20)));
+                }
+            }
+
+            // Visual pull tilt on slime when grounded and in radius (never alters player physics body or velocity!)
+            if (!this.hasWon && !this.isJumping && isGrounded && pullFactor > 0.05) {
+                const targetTilt = (dx > 0 ? 1 : -1) * ANIM_GOAL.PULL_MAX_TILT * pullFactor;
+                this.player.setAngle(targetTilt);
+            } else if (!this.hasWon && !this.isJumping) {
+                this.player.setAngle(0);
+            }
+        }
+
         this.checkHintsAtPosition(this.player.x);
 
         // Debug Visualizations (F2 toggled)
@@ -4612,6 +5303,8 @@ class GameScene extends Phaser.Scene {
 
         this.isDead = false;
         this.hasWon = false;
+        this.levelCompleted = false;
+        this.player.setAngle(0);
         this.inputLocked = false;
         this.touchLeft = false;
         this.touchRight = false;
@@ -4715,26 +5408,96 @@ class GameScene extends Phaser.Scene {
         }
 
         this.tweens.killTweensOf(this.player);
-        this.tweens.add({
-            targets: this.player,
-            y: this.player.y - 20,
-            duration: 200,
-            yoyo: true,
-            repeat: 0,
-            ease: 'Quad.easeOut'
-        });
 
-        const elapsedSeconds = Math.max(1, Math.floor((Date.now() - this.levelStartTime) / 1000));
-        this.time.delayedCall(350, () => {
-            if (window.UIManager) {
-                window.UIManager.showLevelComplete(
-                    this.levelData.id,
-                    this.levelData.name,
-                    this.levelDeaths,
-                    elapsedSeconds
-                );
-            }
-        });
+        if (this.isVortexGoal) {
+            const targetX = this.goalHoleX || this.goal.x;
+            const targetY = this.goalHoleY || this.goal.y;
+
+            // Spiral suction tween: slime spirals into black hole core, stretching & spinning
+            this.tweens.add({
+                targets: this.player,
+                x: targetX,
+                y: targetY,
+                scaleX: 0.35,
+                scaleY: 1.6,
+                angle: 540,
+                duration: 650,
+                ease: 'Cubic.easeIn',
+                onComplete: () => {
+                    this.tweens.add({
+                        targets: this.player,
+                        scaleX: 0,
+                        scaleY: 0,
+                        alpha: 0,
+                        duration: 180,
+                        ease: 'Quad.easeIn'
+                    });
+
+                    // Vortex pulse collapse
+                    if (this.goal) {
+                        this.tweens.add({
+                            targets: this.goal,
+                            scaleX: this.goal.scaleX * 0.75,
+                            scaleY: this.goal.scaleY * 0.75,
+                            duration: 120,
+                            yoyo: true,
+                            ease: 'Back.easeIn'
+                        });
+                    }
+
+                    // Expanding code shockwave ring
+                    const ring = this.add.circle(targetX, targetY, 6, 0x00f2fe, 0).setDepth(15);
+                    ring.setStrokeStyle(3, 0xa855f7, 0.9);
+                    this.tweens.add({
+                        targets: ring,
+                        radius: 55,
+                        alpha: 0,
+                        duration: 350,
+                        ease: 'Quad.easeOut',
+                        onComplete: () => ring.destroy()
+                    });
+
+                    // Soft screen flash and tiny camera zoom
+                    this.cameras.main.flash(180, 168, 85, 247, false);
+                    this.cameras.main.zoomTo(1.03, 120, 'Sine.easeInOut', true, (cam, progress) => {
+                        if (progress === 1) this.cameras.main.zoomTo(1.0, 150, 'Sine.easeInOut');
+                    });
+                }
+            });
+
+            const elapsedSeconds = Math.max(1, Math.floor((Date.now() - this.levelStartTime) / 1000));
+            this.time.delayedCall(ANIM_GOAL.ENTER_DURATION, () => {
+                if (window.UIManager) {
+                    window.UIManager.showLevelComplete(
+                        this.levelData.id,
+                        this.levelData.name,
+                        this.levelDeaths,
+                        elapsedSeconds
+                    );
+                }
+            });
+        } else {
+            this.tweens.add({
+                targets: this.player,
+                y: this.player.y - 20,
+                duration: 200,
+                yoyo: true,
+                repeat: 0,
+                ease: 'Quad.easeOut'
+            });
+
+            const elapsedSeconds = Math.max(1, Math.floor((Date.now() - this.levelStartTime) / 1000));
+            this.time.delayedCall(350, () => {
+                if (window.UIManager) {
+                    window.UIManager.showLevelComplete(
+                        this.levelData.id,
+                        this.levelData.name,
+                        this.levelDeaths,
+                        elapsedSeconds
+                    );
+                }
+            });
+        }
     }
 }
 

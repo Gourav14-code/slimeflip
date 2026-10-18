@@ -70,7 +70,7 @@ All assets are mapped from `assets/zone1/` with exact roles. Only approved side-
 | `obs_bullet` | `obs_bullet.png` | **Turret Projectile:** Linear kinetic projectile. |
 | `obs_crusher` | `obs_crusher.png` | **Timed Stomper / Crusher:** Telegraphed crushing block that slams down and resets. |
 | `checkpoint_flag` | `checkpoint_flag.png` | **Checkpoint:** Interactive flag activating instant respawn point. |
-| `goal_flag` | `goal_flag.png` | **Level Exit Goal:** Floating milestone flag triggering level completion. |
+| `goal_vortex_tall` | `goal_vortex_tall.png` | **Level Exit Black Hole Vortex (Flag Size 60x95px):** Animated black hole vortex (breathing backdrop, dynamic additive swirl, inward particle stream, and pulsing core) triggering level completion and absorption. Legacy `goal_flag` is retained as fallback. |
 | `zone1_decor_rocks` | `zone1_decor_rocks.png` | **Visual Decor Only:** Non-colliding rocks on platform tops. |
 | `zone1_decor_stalactite`| `zone1_decor_stalactite.png`| **Visual Decor Only:** Non-colliding hanging formations from ceilings. |
 
