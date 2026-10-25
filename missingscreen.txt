@@ -1,0 +1,125 @@
+Ek Android mobile game ko professional aur Google Play Store ready banane ke liye jo-jo screens aur features chahiye hote hain, unka complete blueprint:
+
+---
+
+### 📱 1. Core Screens ki Complete List (End-to-End User Flow)
+
+#### 1. Splash Screen (Brand Identity)
+* **Kya dikhega:**
+  * Aapka Studio Logo / Name (e.g. *"Aapka Studio Presents"*).
+  * Made with Phaser / Custom Engine logo.
+  * Duration: 1.5 se 2 seconds with a smooth fade-in / fade-out.
+
+#### 2. Loading / Preloader Screen (Android Booting)
+* **Kya dikhega:**
+  * Slime ka cute running/squishing loader animation.
+  * Progress Bar (0% to 100%) jo game assets load karegi.
+  * Niche fun gameplay tips/quotes (e.g. *"Tip: Jo darawna dikhe wo hamesha sach nahi hota!"*).
+
+#### 3. Main Landing / Home Screen
+* **Kya dikhega:**
+  * Game Logo: **"SLIME FLIP"** (animated glow ke sath).
+  * Center me Slime mascot (idle bouncing, blinking, tap karne par cute reaction).
+  * **PLAY** button (bada aur inviting).
+  * Quick access icons:
+    * ⚙️ **Settings** (Sound, Haptics, Controls)
+    * 🎁 **Daily Reward**
+    * 👕 **Skins / Wardrobe** (Slime ke alag-alag roop)
+    * 🏆 **Achievements / Leaderboard**
+  * Top bar: Total Stars collected, Total Coins.
+
+#### 4. World Map / Level Select Screen (Candy Crush / Mario Winding Path Style) 🗺️
+* **Design & Flow:**
+  * Ek vertical winding (curved) path jo bottom se top ki taraf jaata hai.
+  * **5 Zones ka progression (Har Zone me 30 Levels = Total 150 Levels):**
+    * **Zone 1: Crystal Cavern** (Levels 1–30) — Purple/Cyan cave theme.
+    * **Zone 2: Ancient Machinery** (Levels 31–60) — Gears, moving saws, bounce pads.
+    * **Zone 3: Celestial Sky Islands** (Levels 61–90) — Floating clouds, sky voids.
+    * **Zone 4: Inversion Core** (Levels 91–120) — High gravity flipping gauntlets.
+    * **Zone 5: The Neon Void / Final Gauntlet** (Levels 121–150) — Ultimate master trial.
+  * **Level Nodes:**
+    * Completed level: Level number + 1 to 3 stars earned.
+    * Current level: Pulsing green ring (highlighted).
+    * Locked level: Lock icon 🔒.
+    * Boss / Landmark levels (har 15th aur 30th level par special big star/chest icon).
+  * Map screen khulte hi camera automatically player ke **current unlocked level** par smooth scroll karke center ho jayega.
+
+#### 5. Pre-Level Dialog / Level Card Popup
+* Map par kisi level node par click karne par direct jump karne ke bajaye ek card pop-up:
+  * Level Title (e.g. *"Level 4: Pahaad ki Chadhai"*).
+  * Star Goals (e.g., ⭐ Complete Level | ⭐⭐ Beat in < 20s | ⭐⭐⭐ Zero Deaths).
+  * Player ka Best Time & Fewest Deaths.
+  * **"START"** button.
+
+#### 6. In-Game Screen & HUD (Gameplay View)
+* Game world (1280x720) with Mobile Safe-Areas (punch-hole camera aur notch se safe distance).
+* Top HUD:
+  * ⏸️ Pause button (Top-Right).
+  * Level Title & Deaths Counter (Top-Left/Center).
+* Ergonomic Mobile Touch Controls:
+  * Left side: ◀ Left & Right ▶ buttons.
+  * Right side: ⬆ Jump button + 🌀 Flip button (sirf Flip Zones me visible).
+
+#### 7. Pause Menu (Overlay Modal)
+* Gameplay pause hone par:
+  * ▶ **Resume**
+  * 🔄 **Restart Level**
+  * 🗺️ **World Map**
+  * 🔊 Quick Sound & Music Mute toggles.
+
+#### 8. "Stuck / Need a Hint?" Popup (Rage-Quit Prevention)
+* Level Devil type games me jab player ek hi level me 8–10 baar out ho jata hai:
+  * Ek soft popup: *"Tough puzzle? Watch a quick video to reveal a Hint or Skip Level"*.
+  * Isse player frustrate hokar game uninstall nahi karega aur monetization bhi badhegi.
+
+#### 9. Level Complete / Victory Screen
+* Level complete hone par:
+  * **"LEVEL COMPLETED!"** celebration banner.
+  * 3 Stars filling animation (sound effects ke sath).
+  * Stats: Time Taken, Deaths Count.
+  * Buttons:
+    * 🔄 **Replay**
+    * 🗺️ **Map**
+    * ⏩ **Next Level**
+    * 🎁 **Double Stars / Extra Coins** (Rewarded Ad button).
+
+#### 10. Settings Screen / Popup
+* **BGM Volume** (Slider / Toggle).
+* **SFX Volume** (Slider / Toggle).
+* **Vibration / Haptics On/Off** (Mobile me jump/death par vibration feel acchi deti hai).
+* **Controls Mode** (Touch buttons size & position adjust karne ka option).
+* **Privacy Policy & Terms** (Google Play Store compliance ke liye mandatory).
+* **Restore Purchases / Credits**.
+
+#### 11. Slime Wardrobe / Skins Shop
+* Android retention boost karne ke liye:
+  * Slime skins: Ninja Slime, Golden Slime, Crown/King Slime, Fire Slime, Ghost Slime.
+  * Unlock via Stars collected ya in-game coins.
+
+#### 12. Daily Login Reward Screen (7-Day Streak)
+* Har 24 ghante me open karne par reward (Day 1: 50 coins ... Day 7: Exclusive Skin).
+* Android retention (Day 1, Day 7, Day 30 retention) ke liye zaroori hota hai.
+
+---
+
+### ⚙️ 2. Android Ke Liye Technical Essentials (Jo Web Me Miss Hoti Hain)
+
+1. **Android Hardware Back-Button Handling:**
+   - Phone ka back button dabane par app achanak crash/close na ho.
+   - Gameplay me ho toh Pause menu open ho; Menu me ho toh *"Are you sure you want to exit?"* popup aaye.
+2. **Notch & Cutout Safe-Area:**
+   - Aaj-kal ke Android phones 20:9 aspect ratio aur punch-hole cameras wale hote hain. HUD elements edges se thoda andar hone chahiye taaki camera hole ke niche na chupein.
+3. **Offline Play (No Internet Required):**
+   - Game 100% offline bhi chale.
+4. **Haptic Feedback:**
+   - Android vibration API integrate ho (Spike hit hone par sharp buzz, trampoline bounce par soft pop).
+5. **Save State & Cloud Backup (Local Storage / Google Play Games):**
+   - Player ka progress (unlocked levels, stars, deaths) safely save rahe.
+6. **Monetization Hooks:**
+   - AdMob Banner (menus me bottom me).
+   - Interstitial Ads (har 3-4 level complete hone par ek ad).
+   - Rewarded Ads (Level skip ya hint ke liye voluntary ad).
+
+---
+
+Aapko is layout me sabse pehle **Candy Crush style Curved World Map** aur **Splash/Home Screen** ka structure design karna hai ya koi specific screen pehle chahiye?

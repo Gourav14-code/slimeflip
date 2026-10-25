@@ -424,6 +424,32 @@
       "status": "cleaned",
       "size_warning": false
     },
+    "zone1_stalactite_big.png": {
+      "file": "zone1_stalactite_big.png",
+      "source_file": "zone1_stalactite_big.png",
+      "role": "hazard",
+      "size_px": [
+        156,
+        512
+      ],
+      "file_size_kb": 89.4,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "zone1_signpost.png": {
+      "file": "zone1_signpost.png",
+      "source_file": "zone1_signpost.png",
+      "role": "object",
+      "size_px": [
+        350,
+        512
+      ],
+      "file_size_kb": 173.3,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
     "zone1_background.png": {
       "file": "zone1_background.png",
       "source_file": "zone 1background.png",
@@ -546,6 +572,32 @@
           424
         ]
       }
+    },
+    "zone1_stalactite_big.png": {
+      "file": "zone1_stalactite_big.png",
+      "source_file": "zone1_stalactite_big.png",
+      "role": "prank",
+      "size_px": [
+        156,
+        512
+      ],
+      "file_size_kb": 89.4,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
+    },
+    "zone1_signpost.png": {
+      "file": "zone1_signpost.png",
+      "source_file": "zone1_signpost.png",
+      "role": "object",
+      "size_px": [
+        350,
+        512
+      ],
+      "file_size_kb": 173.3,
+      "transparent": true,
+      "status": "cleaned",
+      "size_warning": false
     }
   },
   "needs_regeneration": [

@@ -42,11 +42,13 @@
             bounce_pad_up: 'assets/zone1/bounce_pad_up.png',
             bounce_pad_down: 'assets/zone1/bounce_pad_down.png',
             checkpoint_flag: 'assets/zone1/checkpoint_flag.png',
-            goal_flag: 'assets/zone1/goal_flag.png'
+            goal_flag: 'assets/zone1/goal_flag.png',
+            zone1_signpost: 'assets/zone1/zone1_signpost.png'
         },
         decor: {
             zone1_decor_rocks: 'assets/zone1/zone1_decor_rocks.png',
-            zone1_decor_stalactite: 'assets/zone1/zone1_decor_stalactite.png'
+            zone1_decor_stalactite: 'assets/zone1/zone1_decor_stalactite.png',
+            zone1_stalactite_big: 'assets/zone1/zone1_stalactite_big.png'
         },
         missingOrRegen: {
             trap_plate_floor: { missing: true, reason: 'File not yet provided in assets' },
@@ -171,15 +173,15 @@
             isMoving: true
         },
         fallingPlatform: {
-            texture: 'falling_platform',
-            file: 'falling_platform.png',
-            nativeSize: [512, 508],
-            walkLeft: 0,
-            walkRight: 512,
-            walkTop: 0,
-            designThickness: 64,
+            texture: 'zone1_plat_small',
+            file: 'zone1_plat_small.png',
+            nativeSize: [512, 230],
+            walkLeft: 12,
+            walkRight: 500,
+            walkTop: 15,
+            designThickness: 56,
             defaultWidth: 110,
-            oneWay: false,
+            oneWay: true,
             ceiling: false,
             isFalling: true
         },

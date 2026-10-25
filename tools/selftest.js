@@ -1,9 +1,11 @@
 // tools/selftest.js
 // Standalone self-test and level validator runner for SlimeFlip
 
+const fs = require('fs');
 const path = require('path');
 
 // 1. Stub Phaser environment for headless Node.js execution
+
 global.Phaser = {
     Scene: class {},
     Game: class {},

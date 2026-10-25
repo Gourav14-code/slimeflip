@@ -160,15 +160,15 @@ Every level must strictly obey these deterministic constraints to guarantee sati
 
 | Level | Level Name / Theme | Width ($px$) | Hazard Count | Max Gap % | Max Gap ($px$) | Checkpoints | Flip Sections | Role / Pacing |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **L1** | Crystal Cavern (Tutorial) | 3500 | 3 | 40% | 58 px | 0 | 0 | Intro, basic running & jumping |
-| **L2** | Ancient Slabs | 4450 | 5 | 42% | 61 px | 1 | 0 | Small platform steps |
-| **L3** | Pillar Steps | 4700 | 5 | 45% | 65 px | 1 | 0 | High route introduction |
-| **L4** | Spike Valley | 5300 | 7 | 47% | 68 px | 1 | 0 | Static spike navigation |
-| **L5** | **Mossy Respite** *(Breather)* | 5200 | 5 | 45% | 65 px | 2 | 0 | **Breather:** Wide platforms, scenic pacing |
-| **L6** | Moving Machinery | 6000 | 8 | 52% | 75 px | 2 | 0 | Moving platforms & pits |
-| **L7** | The Inversion Core | 6100 | 8 | 54% | 78 px | 2 | 1 | Gravity flip introduction |
-| **L8** | Ceiling Runner | 7400 | 7 | 56% | 81 px | 3 | 2 | Twin flip corridors |
-| **L9** | Falling Sands / Sawblade Alley | 7300 | 10 | 58% | 84 px | 3 | 1 | Falling platform chains & patrol saws |
+| **L1** | Crystal Cavern (Level Devil Pranks) | 2800 | 2 | 40% | 58 px | 0 | 0 | Intro, running floor & prank traps |
+| **L2** | Ancient Slabs | 3500 | 2 | 42% | 61 px | 1 | 0 | Small platform steps |
+| **L3** | Sky Islands | 5400 | 2 | 45% | 65 px | 1 | 1 | Floating sky islands, gravity betrayal & shifting stone |
+| **L4** | Pahaad ki Chadhai | 4400 | 3 | 47% | 68 px | 2 | 0 | Two saws, one spike strip, the abyss, stalactite drops & rising gate |
+| **L5** | **Mossy Respite** *(Breather)* | 5200 | 5 | 45% | 65 px | 2 | 0 | **Breather:** Wide platforms, scenic pacing & playful trust pranks |
+| **L6** | Moving Machinery | 6000 | 8 | 52% | 75 px | 2 | 0 | Moving platforms, pad-assisted pits, shifting HP2 & rising hurdles |
+| **L7** | The Inversion Core | 6100 | 8 | 54% | 78 px | 2 | 1 | Gravity flip introduction, ceiling corridor, wall hurdles & pop-up ambush |
+| **L8** | Ceiling Runner | 7400 | 7 | 56% | 81 px | 3 | 2 | Twin flip corridors, ceiling route, shifting chasm stone & goal hurdle |
+| **L9** | Falling Sands / Sawblade Alley | 7300 | 10 | 58% | 84 px | 3 | 1 | Falling platform chains, patrol saws, flip corridor & rising gate finale |
 | **L10** | **The Crucible** *(Gauntlet)* | 5200 | 14 | 62% | 90 px | 4 | 2 | **Gauntlet 1:** Zone 1 climax challenge |
 | **L11** | Whispering Heights | 4800 | 10 | 62% | 90 px | 4 | 1 | Higher platform tiers (330/240) |
 | **L12** | Pendulum Pass | 4900 | 11 | 64% | 93 px | 4 | 0 | Swinging saws timing |
@@ -248,6 +248,7 @@ These standing visual, layering, and spatial rules apply to every level in Slime
 
 5. **Hazard Placement & Footing:**
    - Every hazard must stand fully on solid walkable ground, at least **$60\text{ px}$** from any ground or platform edge, and never overlap another hazard or decorative element.
+   - *Waiver:* A spike bed under a floating route (a hazard wider than the jump distance below platforms that are the only route) may touch the side of a pillar and the end of a ground slab; the 60 px edge rule and the 250 px flat-ground rule do not apply to it because the player never walks on it; the validator checks that the floating route above it is continuous.
 
 6. **Intimidating but Fair & Logical Routes:**
    - Obstacles must look intimidating and thrilling, but always be crossable via a clear, logical, solvable route (a ground route and, where possible, a platform route). Never create an impossible-looking or physically impossible layout.
@@ -275,6 +276,12 @@ These standing visual, layering, and spatial rules apply to every level in Slime
 
 14. **Twin Strips Rule:**
     - Two floor spike strips with a landing gap of $160\text{ px}$ between them count as ONE hazard group (each strip at most $70\text{ px}$ wide). The $250\text{ px}$ flat-ground rule applies before and after the group; the gap between the strips is flat and hazard-free. The validator checks that a single jump from at least $80\text{ px}$ before the first strip clears it and lands inside the gap (at least $40\text{ px}$ from each strip), and that a jump from the gap center clears the second strip, with a $15\%$ margin.
+
+15. **Wide Pit & Beat Density Rule:**
+    - A pit wider than the jump distance is allowed only when a continuous floating route covers it, a spawn or checkpoint is within 400 px before its start and at least 250 px of flat ground follows it. Beat density: a level should have something happening about every 400 px; flat stretches without any element are at most 350 px.
+
+16. **Platform Visual Look & Prank Platform Rule:**
+    - A platform must always look like a platform. A special platform (falling, shifting) keeps the silhouette, size and art of the normal platforms of its level and is marked only by cracks, glow or a tell; a block, cube or any non-platform image is never used as a standing surface. A sign never stands on a platform that is part of a prank sequence.
 
 ---
 
@@ -479,3 +486,21 @@ Warnings printed (never auto-fixed) when any of the following is violated:
 4. Any checkpoint is fewer than 150 px from flat-ground start or end (not enough run-up / run-out).
 5. A mandatory section (pit, pad-assisted pit, falling-platform chain, flip zone, gauntlet) has no checkpoint or spawn within 400 px before it.
 6. Any consecutive gap exceeds 1.6 × average spacing (for levels with ≥ 3 checkpoints).
+
+---
+
+## 13. PRANK TRAPS (LEVEL DEVIL STYLE)
+
+- **Philosophy:** Easy to read, sneaky to trust. Every level has three beats: a calm promise, a betrayal, and a payoff. The first prank appears within 600 px of the spawn.
+- **Pranks are data:** An array `pranks` in the level data in `levels.js`. A prank may skip the normal 0.5 second warning rule, but must give a micro-tell of 0.15 to 0.35 seconds (dust puff, small tremor or a soft sound), must be deterministic (identical every attempt), and must be beatable by an attentive player on the second attempt with the same margins as a normal hazard (the validator simulates this).
+- **Limits:** At most one prank per 700 px, never two pranks in one jump window, a prank needs at least 150 px of flat ground before it, and a spawn or checkpoint within 600 px before the first prank.
+- **Cruelty dial:** A constant `PRANK_LEVEL` in the game config (1 = no pranks, 2 = micro-tell, default, 3 = no tell), with an optional per-level override.
+- **Retry loop:** Respawn in under 0.4 seconds with a full reset of every prank (tiles, spikes, signs, goal); no popup or loading.
+- **Honest hazards:** A level may include normal, visible, honest hazards between pranks, to make the player doubt.
+- **Prank types:** `runningFloor`, `popupSpikes`, `speechSign`, `runawayGoal`, `fakeHazard`, `wallAppear`, `shiftPlatform`, and the existing `vanishingRoad`, `shiftDown` and `reappearingPlatform`.
+  - `fakeHazard {x, w, bubbleText}`: Looks identical to a real floor spike strip, has no hitbox and can never kill. When overlapping player body, displays a speech bubble with `bubbleText` for 1 second (once per attempt).
+  - `wallAppear {x, w, h, triggerX, tellMs, fadeMs}`: When player passes `triggerX`, dust puff and low rumble start for `tellMs` (default 340), then a solid stone block (`zone1_wall` or `zone1_pillar`) fades in over `fadeMs` (default 150) and stays solid until respawn.
+  - `shiftPlatform {platform: {x, y, w}, triggerPlatform: {x, y, w} or triggerDist, tellMs, dx, dy, slideMs}`: Generalization of `shiftDown`. When triggered (standing on `triggerPlatform` or within `triggerDist`), platform shakes for `tellMs` (default 340), then slides by `(dx, dy)` over `slideMs` (default 350) with smooth ease, carrying the player if standing on it.
+  - `stalactiteDrop {landX, landY, hangY, triggerX, triggerPlatform, tellMs, accel, maxSpeed}`: A large stalactite hanging from the cave top at `x = landX` (default `hangY = 90`, `tellMs = 330`, `accel = 2400`, `maxSpeed = 1100`). Triggers when player passes `triggerX` moving right (or stands on `triggerPlatform` at or beyond `triggerX`). Tells for `tellMs` with base dust trickle and 3 px tremor, then drops straight down. Kills only while falling through a narrow hitbox (lower 40% height, 35% width). Shatters on impact at `landY` with debris particles and subtle camera shake (at most 3 px, 120 ms), leaving no residual collider so the surface stays fully walkable.
+- **Stalactite pranks:** The dangerous stalactite uses the big glowing-tip asset; harmless decoration stalactites use the small decor asset and never hang within 150 px horizontally of a path, a platform or a prank. At most two stalactite pranks per level, one outrun type and one wait type, at least 700 px apart.
+- **Inversion pranks:** A `fakeHazard` must look identical to a real hazard and be harmless; at most one fake per level; a prank may sit in the landing zone of a jump over a fakeHazard only if it has its micro-tell and at least 150 px of flat ground between them.

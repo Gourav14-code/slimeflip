@@ -39,12 +39,12 @@ if (typeof window !== 'undefined') {
 
 var GAME_LEVELS = [
     // ========================================================================
-    // LEVEL 1: Crystal Cavern (3600 px wide) - Beautiful Varied Introduction
+    // LEVEL 1: Crystal Cavern (2800 px wide) - Prank Traps (Level Devil Style)
     // ========================================================================
     {
         id: 1,
         name: 'Level 1: Crystal Cavern',
-        worldWidth: 3600,
+        worldWidth: 2800,
         worldHeight: 720,
         bgTint: 0xffffff,
         playerStart: { x: 140, y: 568 },
@@ -54,451 +54,602 @@ var GAME_LEVELS = [
         zones: [],
 
         pits: [
-            // ONE open pit (100px wide, x: 1800 to 1900)
-            { x: 1800, w: 100 }
+            // Section 7: ONE open pit (120px wide, x: 1840 to 1960)
+            { x: 1840, w: 120 }
         ],
 
         platforms: [
-            // Base Ground Slab 1 (0 to 1800)
-            { type: 'ground', x: 0, y: 600, w: 1800 },
+            // Base Ground Slab 1 (0 to 600)
+            { type: 'ground', x: 0, y: 600, w: 600 },
 
-            // Section 2: Short stone step (x: 700 to 800, tier 510)
-            { type: 'wall', x: 700, y: 510, w: 100 },
+            // Running Floor (600 to 1000) is defined in pranks array and connected as ground
 
-            // Section 3: Platform stairs in the air (tier 420 -> 330 peak -> 420 descend)
-            { type: 'small', x: 860, y: 420, w: 160 },
-            { type: 'small', x: 1075, y: 330, w: 160 },
-            { type: 'small', x: 1290, y: 420, w: 160 },
+            // Base Ground Slab 2 (1000 to 1840)
+            { type: 'ground', x: 1000, y: 600, w: 840 },
 
-            // Base Ground Slab 2 (1900 to 3600)
-            { type: 'ground', x: 1900, y: 600, w: 1700 },
-
-            // Section 7: Blade zone bypass route above saw (step at 510 -> platform at 420)
-            { type: 'wall', x: 2330, y: 510, w: 100 },
-            { type: 'small', x: 2500, y: 420, w: 180 }
+            // Base Ground Slab 3 (1960 to 2800)
+            { type: 'ground', x: 1960, y: 600, w: 840 }
         ],
 
-        telegraphedHazards: [
-            // Section 7: Patrol saw rolling slowly (x1.0 speed) over 200px range (x: 2510 to 2710)
-            {
-                id: 'patrol_saw_1_1',
-                type: 'patrolSaw',
-                hazardType: 'saw',
-                x: 2510,
-                y: 564,
-                radius: 36,
-                axis: 'horizontal',
-                distance: 200,
-                duration: 2500
-            }
-        ],
+        telegraphedHazards: [],
 
         spikes: [
-            // Section 3b: Floor spike strip (100px wide) under peak platform (x: 1100 to 1200)
-            { x: 1150, y: 600, width: 100, height: 45, side: 'floor' },
+            // Section 9: ONE honest floor spike strip, 60px wide (x: 2210 to 2270, center 2240)
+            // Exactly 250px of flat ground before it (2210 - 1960 = 250px)
+            { x: 2240, y: 600, width: 60, height: 45, side: 'floor' }
+        ],
 
-            // Section 9: Small floor spike strip (60px wide, x: 3200 to 3260)
-            { x: 3230, y: 600, width: 60, height: 45, side: 'floor' }
+        pranks: [
+            // 1. Running Floor (x: 600 to 1000, 8 tiles of 50px)
+            {
+                id: 'running_floor_1',
+                type: 'runningFloor',
+                x: 600,
+                y: 600,
+                w: 400,
+                tileCount: 8,
+                tileWidth: 50,
+                firstDelay: 350,
+                stepDelay: 220,
+                shakeDuration: 100
+            },
+            // 2. Pop-up Spikes (x: 1380 to 1480, 100px wide, center 1430)
+            {
+                id: 'popup_spikes_1',
+                type: 'popupSpikes',
+                x: 1430,
+                y: 600,
+                width: 100,
+                height: 45,
+                triggerX: 1340,
+                tellDuration: 250,
+                riseDuration: 90
+            },
+            // 3. Runaway Goal (x: 2500, hops to 2720)
+            {
+                id: 'runaway_goal_1',
+                type: 'runawayGoal',
+                x: 2500,
+                y: 600,
+                triggerDist: 160,
+                hopDist: 220,
+                targetX: 2720,
+                speechText: 'Hehe, catch me!'
+            }
         ],
 
         decor: [
             // Ground rocks along safe sections (never in or near pit)
-            { type: 'decor_rocks', x: 320, y: 600 },
+            { type: 'decor_rocks', x: 260, y: 600 },
+            { type: 'decor_rocks', x: 480, y: 600 },
+            { type: 'decor_rocks', x: 1120, y: 600 },
             { type: 'decor_rocks', x: 1650, y: 600 },
-            { type: 'decor_rocks', x: 2050, y: 600 },
-            { type: 'decor_rocks', x: 2950, y: 600 },
-            { type: 'decor_rocks', x: 3360, y: 600 },
+            { type: 'decor_rocks', x: 2020, y: 600 },
+            { type: 'decor_rocks', x: 2400, y: 600 },
+            { type: 'decor_rocks', x: 2760, y: 600 },
 
-            // Hanging stalactites near the top (never blocking player or jumps)
-            { type: 'decor_stalactite', x: 450, y: 30 },
-            { type: 'decor_stalactite', x: 2120, y: 30 }
+            // Hanging stalactites near the top (background decoration only)
+            { type: 'decor_stalactite', x: 400, y: 30 },
+            { type: 'decor_stalactite', x: 1200, y: 30 },
+            { type: 'decor_stalactite', x: 1750, y: 30 },
+            { type: 'decor_stalactite', x: 2350, y: 30 }
         ],
 
-        goal: { x: 3300, y: 600 },
+        goal: { x: 2500, y: 600 },
 
         hints: [
-            { triggerX: 100,  text: 'Level 1: Crystal Cavern! Run with Arrow Keys or A/D, Jump with SPACE or ▲.' },
-            { triggerX: 620,  text: 'Use the platform stairs above, or take the ground path!' },
-            { triggerX: 1700, text: '⚠️ ABYSS PIT: Leap across the gap to the other side!' },
-            { triggerX: 2240, text: '⚠️ PATROL SAW: Take the upper stone route or time your jump!' },
-            { triggerX: 3100, text: '⚠️ Final spike! Clear the hazard to reach the goal flag!' }
+            { triggerX: 100,  text: 'Level 1: Crystal Cavern! Run with Arrow Keys or A/D, Jump with SPACE or ▲.' }
         ]
     },
 
     // ========================================================================
-    // LEVEL 2: Ancient Slabs (4450 px wide) - Platform Stairs & Dual Saws
+    // LEVEL 2: Ancient Slabs (3500 px wide) - Prank Traps (Level Devil Style)
     // ========================================================================
     {
         id: 2,
         name: 'Level 2: Ancient Slabs',
-        worldWidth: 4450,
+        worldWidth: 3500,
         worldHeight: 720,
         bgTint: 0xffffff,
         playerStart: { x: 140, y: 568 },
 
         checkpoints: [
-            // Section 7: Checkpoint flag at x: 2150 (rest area between S3 and pit)
-            { id: 'cp_l2_a', x: 2150, y: 600 }
+            // Section 6: checkpoint_flag at x: 1800 (within 400px before pit at 2000, >=150px flat hazard-free ground on both sides)
+            { id: 'cp_l2_1', x: 1800, y: 600 }
         ],
 
         zones: [],
 
         pits: [
-            // ONE open pit (110px wide, x: 2450 to 2560)
-            { x: 2450, w: 110 }
+            // Section 7: ONE open pit (420px wide, x: 2000 to 2420)
+            { x: 2000, w: 420 }
         ],
 
         platforms: [
-            // Base Ground Slab 1 (0 to 2450)
-            { type: 'ground', x: 0, y: 600, w: 2450 },
+            // Base Ground Slab 1 (0 to 2000)
+            { type: 'ground', x: 0, y: 600, w: 2000 },
 
-            // Section 3: Short stone step 1 (x: 1000 to 1100, tier 510, w: 100)
-            { type: 'wall', x: 1000, y: 510, w: 100 },
+            // Section 7: Two floating platforms over pit at tier 510 (zone1_plat_small art, one-way, walkable width 110px)
+            // P1: x: 2050 to 2160 (w: 110, y: 510)
+            { type: 'small', x: 2050, y: 510, w: 110, oneWay: true },
 
-            // Section 4: Platform stairs in the air (one-way, w: 160 each, gaps 55px, steps 90px)
-            { type: 'small', x: 1155, y: 420, w: 160, oneWay: true },
-            { type: 'small', x: 1370, y: 330, w: 160, oneWay: true },
-            { type: 'small', x: 1585, y: 240, w: 160, oneWay: true }, // The Peak
-            { type: 'small', x: 1800, y: 330, w: 160, oneWay: true },
-            { type: 'small', x: 2015, y: 420, w: 160, oneWay: true },
+            // P2: x: 2215 to 2325 (w: 110, y: 510) - shifts to 2275..2385 via shiftPlatform prank
+            { type: 'small', x: 2215, y: 510, w: 110, oneWay: true },
 
-            // Base Ground Slab 2 (2560 to 4450)
-            { type: 'ground', x: 2560, y: 600, w: 1890 },
-
-            // Section 10: Second short stone step (x: 3300 to 3390, tier 510, w: 90)
-            { type: 'pillar', x: 3300, y: 510, w: 90 },
-
-            // Section 11: Platform route above saw 2 (gaps 60px <= 61px max gap)
-            { type: 'small', x: 3450, y: 420, w: 160, oneWay: true }, // Platform A
-            { type: 'small', x: 3670, y: 330, w: 160, oneWay: true }, // Platform B
-            { type: 'small', x: 3890, y: 420, w: 160, oneWay: true }  // Platform C
+            // Base Ground Slab 2 (2420 to 3500)
+            { type: 'ground', x: 2420, y: 600, w: 1080 }
         ],
 
         telegraphedHazards: [
-            // Section 9: patrolSaw 1 (saw asset), slow (~x1.0 speed), range 200px (x: 2900 to 3100)
+            // Section 8: ONE honest patrolSaw (saw asset), range 180px at x: 2700 to 2880, speed x1.0, >=150px free flat ground
             {
                 id: 'patrol_saw_2_1',
                 type: 'patrolSaw',
                 hazardType: 'saw',
-                x: 2900,
-                y: 555,
-                radius: 45,
+                x: 2700,
+                y: 560,
+                radius: 40,
                 axis: 'horizontal',
-                distance: 200,
-                duration: 2500
-            },
-            // Section 11: patrolSaw 2 under Platform B, range 150px (x: 3680 to 3830)
+                distance: 180,
+                duration: 2250,
+                speedMultiplier: 1.0
+            }
+        ],
+
+        spikes: [],
+
+        pranks: [
+            // 1. Speech Sign 1 at x: 250
             {
-                id: 'patrol_saw_2_2',
+                id: 'speech_sign_2_1',
+                type: 'speechSign',
+                x: 250,
+                y: 600,
+                text: 'Level 2. Ab tum expert ho.'
+            },
+            // 2. Fake Hazard (spikes art, 90px wide) at x: 700 to 790 (center 745)
+            {
+                id: 'fake_hazard_2_1',
+                type: 'fakeHazard',
+                x: 745,
+                y: 600,
+                w: 90,
+                height: 45,
+                bubbleText: 'Sirf sajaavat!'
+            },
+            // 3. Pop-up Spikes prank (110px wide) at x: 960 to 1070 (center 1015, triggerX 900, tellMs 340)
+            {
+                id: 'popup_spikes_2_1',
+                type: 'popupSpikes',
+                x: 1015,
+                y: 600,
+                width: 110,
+                height: 45,
+                triggerX: 900,
+                tellDuration: 340,
+                riseDuration: 90
+            },
+            // 4. Speech Sign 2 at x: 1250
+            {
+                id: 'speech_sign_2_2',
+                type: 'speechSign',
+                x: 1250,
+                y: 600,
+                text: 'Jo darawna dikhe wo asli nahi. Jo shaant dikhe wo asli.'
+            },
+            // 5. Wall Appear prank at x: 1550 to 1640 (w: 90, h: 90, triggerX: 1350, tellMs: 340, fadeMs: 150)
+            {
+                id: 'wall_appear_2_1',
+                type: 'wallAppear',
+                x: 1550,
+                y: 600,
+                w: 90,
+                h: 90,
+                triggerX: 1350,
+                tellMs: 340,
+                fadeMs: 150
+            },
+            // 6. Shift Platform prank on P2 (triggerPlatform: P1, dx: +60, dy: 0, tellMs: 340, slideMs: 350)
+            {
+                id: 'shift_platform_2_1',
+                type: 'shiftPlatform',
+                platform: { x: 2215, y: 510, w: 110 },
+                triggerPlatform: { x: 2050, y: 510, w: 110 },
+                tellMs: 340,
+                dx: 60,
+                dy: 0,
+                slideMs: 350
+            },
+            // 7. Speech Sign 3 at x: 3000
+            {
+                id: 'speech_sign_2_3',
+                type: 'speechSign',
+                x: 3000,
+                y: 600,
+                text: 'Is baar goal nahi bhaagega. Promise.'
+            }
+        ],
+
+        decor: [
+            // Ground rocks along safe sections (seated flush on ground surface, never in pit)
+            { type: 'decor_rocks', x: 220, y: 600 },
+            { type: 'decor_rocks', x: 480, y: 600 },
+            { type: 'decor_rocks', x: 1150, y: 600 },
+            { type: 'decor_rocks', x: 1720, y: 600 },
+            { type: 'decor_rocks', x: 1920, y: 600 },
+            { type: 'decor_rocks', x: 2520, y: 600 },
+            { type: 'decor_rocks', x: 3100, y: 600 },
+            { type: 'decor_rocks', x: 3350, y: 600 },
+            { type: 'decor_rocks', x: 3460, y: 600 },
+
+            // Hanging stalactites near ceiling (background decor only, never over pit route)
+            { type: 'decor_stalactite', x: 300, y: 30 },
+            { type: 'decor_stalactite', x: 850, y: 30 },
+            { type: 'decor_stalactite', x: 1400, y: 30 },
+            { type: 'decor_stalactite', x: 2600, y: 30 },
+            { type: 'decor_stalactite', x: 3150, y: 30 }
+        ],
+
+        goal: { x: 3250, y: 600 },
+
+        hints: [
+            { triggerX: 100,  text: 'Level 2: Ancient Slabs! Keep your eyes sharp for deceptive illusions.' },
+            { triggerX: 1700, text: '🚩 CHECKPOINT SAVED!' },
+            { triggerX: 1980, text: '⚠️ CHASM PIT: Leap across the ancient stones to reach the other side!' },
+            { triggerX: 2600, text: '⚠️ PATROL SAW: Time your leap cleanly across the rolling blade!' },
+            { triggerX: 3180, text: 'Goal ahead! Sprint cleanly to the vortex!' }
+        ]
+    },
+
+    // ========================================================================
+    // LEVEL 3: Sky Islands (5400 px wide) - Floating Islands & Gravity Betrayal
+    // ========================================================================
+    {
+        id: 3,
+        name: 'Level 3: Sky Islands',
+        worldWidth: 5400,
+        worldHeight: 720,
+        bgTint: 0xffffff,
+        playerStart: { x: 140, y: 568 },
+
+        checkpoints: [
+            // Section 4: Functional Mid-Level Checkpoint flag at x=2550 (well-spaced halfway point, >=150px clearance)
+            { id: 'cp_mid3', x: 2550, y: 600 }
+        ],
+
+        zones: [
+            // Section 5: Flip Zone spanning x: 2700 to 3600 (width 900)
+            { type: 'flipZone', x: 2700, width: 900 }
+        ],
+
+        pits: [
+            // Section 2: First Sky Chasm (x: 500 to 1050, w: 550px) - crossed via floating platforms F1 & F2
+            { x: 500, w: 550 },
+
+            // Section 5: Open Sky Abyss inside Flip Zone (x: 2800 to 3300, w: 500px) - traversed via inverted ceiling route
+            { x: 2800, w: 500 }
+        ],
+
+        platforms: [
+            // Section 1: Safe Starting Platform (0 to 500, w: 500, y: 600)
+            { type: 'ground', x: 0, y: 600, w: 500 },
+
+            // Section 2: Floating Islands across Pit 1 (Tiers 510)
+            // Floating Island F1 (tier 510, w: 140, x: 560 to 700) - stable confidence builder
+            { type: 'small', x: 560, y: 510, w: 140, oneWay: true },
+
+            // Floating Island F2 (tier 510, w: 140, x: 770 to 910) - collapsing platform that drops on approach
+            { type: 'small', x: 770, y: 510, w: 140, oneWay: true, troll: 'shiftDown' },
+
+            // Section 3 & 4: Main Challenge Island & Checkpoint (1050 to 2800, w: 1750, y: 600)
+            { type: 'ground', x: 1050, y: 600, w: 1750 },
+
+            // Section 5: Continuous Sky Ceiling Slab for Flip Zone at y=130 (x: 2500 to 3650, w: 1150)
+            { type: 'ceiling', x: 2500, y: 130, w: 1150, ceiling: true },
+
+            // Section 5: Post-Flip Island (3300 to 4300, w: 1000, y: 600)
+            { type: 'ground', x: 3300, y: 600, w: 1000 },
+
+            // Section 6: Stepping Stones across chasm gap (4300 to 4750)
+            // P1 at tier 510: x: 4360 to 4470 (w: 110, gap from ground: 60px)
+            { type: 'small', x: 4360, y: 510, w: 110, oneWay: true },
+
+            // P2 at tier 510: x: 4530 to 4640 (w: 110, initial gap from P1: 60px)
+            // Shifts by dx: +60 to x: 4590..4700 via shiftPlatform prank
+            { type: 'small', x: 4530, y: 510, w: 110, oneWay: true },
+
+            // Section 6: Elevated Decoy Ledge (Deceptive Route) at tier 480 (x: 4850 to 4980, w: 130)
+            { type: 'small', x: 4850, y: 480, w: 130, oneWay: true },
+
+            // Section 6: Spacious Goal Sanctuary Island (4750 to 5400, w: 650, y: 600)
+            { type: 'ground', x: 4750, y: 600, w: 650 }
+        ],
+
+        telegraphedHazards: [
+            // Section 3: Rotating patrolSaw rolling on Ground 2 (x: 1950 to 2130, r: 40, y: 560)
+            {
+                id: 'patrol_saw_3_1',
                 type: 'patrolSaw',
                 hazardType: 'saw',
-                x: 3680,
-                y: 555,
-                radius: 45,
+                x: 1950,
+                y: 560,
+                radius: 40,
                 axis: 'horizontal',
-                distance: 150,
-                duration: 2200
+                distance: 180,
+                duration: 2400,
+                speedMultiplier: 1.0
             }
         ],
 
         spikes: [
-            // Section 2: Floor spike strip S1 (80px wide, x: 650 to 730)
-            { x: 690, y: 600, width: 80, height: 45, side: 'floor' },
+            // Section 3: Honest floor spike strip, 90px wide (x: 1405 to 1495, center 1450)
+            { x: 1450, y: 600, width: 90, height: 45, side: 'floor' },
 
-            // Section 5: Wide floor spike strip S2 (140px wide, x: 1420 to 1560) under peak stairs
-            { x: 1490, y: 600, width: 140, height: 45, side: 'floor' },
+            // Section 5: Unexpected Inverted Ceiling Spikes in Flip Zone (x: 3005 to 3095, center 3050)
+            { x: 3050, y: 130, width: 90, height: 45, side: 'ceiling' }
+        ],
 
-            // Section 5: Small floor spike strip S3 (60px wide, x: 1850 to 1910) under descending stairs
-            { x: 1880, y: 600, width: 60, height: 45, side: 'floor' }
+        pranks: [
+            // 1. Fake Hazard: Harmless Sky Illusion on Ground 1 (x: 420, bubbleText: 'Sky illusion! ☁️')
+            {
+                id: 'fake_hazard_3_1',
+                type: 'fakeHazard',
+                x: 420,
+                y: 600,
+                w: 90,
+                height: 45,
+                bubbleText: 'Sky illusion! ☁️'
+            },
+            // 2. Hidden Popup Spikes Prank on Ground 2 (x: 1650, triggerX: 1540, tellMs: 340)
+            {
+                id: 'popup_spikes_3_1',
+                type: 'popupSpikes',
+                x: 1650,
+                y: 600,
+                width: 90,
+                height: 45,
+                triggerX: 1540,
+                tellDuration: 340,
+                riseDuration: 90
+            },
+            // 3. Shift Platform Prank on P2 (triggerPlatform: P1, dx: +60, dy: 0, tellMs: 340, slideMs: 350)
+            {
+                id: 'shift_platform_3_1',
+                type: 'shiftPlatform',
+                platform: { x: 4530, y: 510, w: 110 },
+                triggerPlatform: { x: 4360, y: 510, w: 110 },
+                tellMs: 340,
+                dx: 60,
+                dy: 0,
+                slideMs: 350
+            },
+            // 4. Wall Appear Prank: Rising stone gate before goal (x: 5100 to 5190, w: 90, h: 90, triggerX: 4920)
+            {
+                id: 'wall_appear_3_1',
+                type: 'wallAppear',
+                x: 5100,
+                y: 600,
+                w: 90,
+                h: 90,
+                triggerX: 4920,
+                tellMs: 340,
+                fadeMs: 150
+            }
         ],
 
         decor: [
             // Ground rocks along safe sections (seated flush on ground surface, never in pit)
             { type: 'decor_rocks', x: 260, y: 600 },
-            { type: 'decor_rocks', x: 480, y: 600 },
-            { type: 'decor_rocks', x: 2340, y: 600 },
-            { type: 'decor_rocks', x: 2700, y: 600 },
-            { type: 'decor_rocks', x: 4180, y: 600 },
-
-            // Hanging stalactites near ceiling (background decor, never blocking player jumps)
-            { type: 'decor_stalactite', x: 380, y: 30 },
-            { type: 'decor_stalactite', x: 2780, y: 30 },
-            { type: 'decor_stalactite', x: 4260, y: 30 }
+            { type: 'decor_rocks', x: 1250, y: 600 },
+            { type: 'decor_rocks', x: 1800, y: 600 },
+            { type: 'decor_rocks', x: 2350, y: 600 },
+            { type: 'decor_rocks', x: 2650, y: 600 },
+            { type: 'decor_rocks', x: 3500, y: 600 },
+            { type: 'decor_rocks', x: 3850, y: 600 },
+            { type: 'decor_rocks', x: 4150, y: 600 },
+            { type: 'decor_rocks', x: 4800, y: 600 },
+            { type: 'decor_rocks', x: 5360, y: 600 }
         ],
 
-        goal: { x: 4300, y: 600 },
+        goal: { x: 5300, y: 600 },
 
         hints: [
-            { triggerX: 100,  text: 'Level 2: Ancient Slabs! Master the platform stairs and floor hazards.' },
-            { triggerX: 920,  text: 'Take the high stairs over the spike beds, or jump through on the ground!' },
-            { triggerX: 2050, text: '🚩 CHECKPOINT SAVED!' },
-            { triggerX: 2360, text: '⚠️ CHASM PIT: Clear the open chasm to reach the other side!' },
-            { triggerX: 2780, text: '⚠️ PATROL SAW: Time your leap cleanly across the rolling blade!' },
-            { triggerX: 3220, text: 'Take the upper stone route over the second saw, or jump below!' }
+            { triggerX: 100,  text: 'Level 3: Sky Islands! Leap across the celestial stones and beware of shifting skies!' },
+            { triggerX: 1200, text: 'Time your sprint over the crystal spikes ahead!' },
+            { triggerX: 1850, text: '⚠️ PATROL SAW: Time your leap cleanly across the rolling blade!' },
+            { triggerX: 2480, text: '🚩 CHECKPOINT SAVED!' },
+            { triggerX: 2660, text: '🌀 GRAVITY FLIP ZONE: Invert gravity and watch for inverted ceiling spikes!' },
+            { triggerX: 4200, text: 'Leap across the shifting stones to reach the sanctuary!' },
+            { triggerX: 5000, text: 'Goal ahead! Clear the rising gate and claim victory!' }
         ]
     },
 
     // ========================================================================
-    // LEVEL 3: Pillar Steps (4700 px wide) - Stepping Stones & Dual Saws
+    // ========================================================================
+    // LEVEL 4: Pahaad ki Chadhai (4400 px wide) - The Abyss, Pillars & Summit
     // ========================================================================
     {
-        id: 3,
-        name: 'Level 3: Pillar Steps',
-        worldWidth: 4700,
+        id: 4,
+        name: 'Level 4: Pahaad ki Chadhai',
+        worldWidth: 4400,
         worldHeight: 720,
         bgTint: 0xffffff,
         playerStart: { x: 140, y: 568 },
 
         checkpoints: [
-            // Section 7: Checkpoint flag at x: 2150 (>=250px flat ground before and after)
-            { id: 'cp_mid3', x: 2150, y: 600 }
+            // CP1: Flag at x = 1150 (>= 150px hazard-free flat ground on both sides, within 400px before pit)
+            { id: 'cp_l4_1', x: 1150, y: 600 },
+            // CP2: Flag at x = 2760 (>= 150px clear flat ground on both sides and >= 150px from pit rim)
+            { id: 'cp_l4_2', x: 2760, y: 600 }
         ],
 
         zones: [],
 
         pits: [
-            // Section 8: ONE long open pit (490px wide, x: 2400 to 2890)
-            { x: 2400, w: 490 }
+            // THE ABYSS: ONE open pit (1026px wide, x: 1540 to 2566)
+            { x: 1540, w: 1026 }
         ],
 
         platforms: [
-            // Base Ground Slab 1 (0 to 2400)
-            { type: 'ground', x: 0, y: 600, w: 2400 },
+            // Ground Slab 1: Base ground from spawn up to the Abyss pit (0 to 1540)
+            { type: 'ground', x: 0, y: 600, w: 1540 },
 
-            // Section 3: Short stone step (x: 1000 to 1100, tier 510, w: 100, h: 90)
-            { type: 'wall', x: 1000, y: 510, w: 100 },
+            // Section 5: Pillar steps (zone1_pillar) touching with 2px overlap
+            // PL1: zone1_pillar at x = 1320..1430, top tier 510 (90px step-up from ground 600)
+            { type: 'pillar', x: 1320, y: 510, w: 112, flipX: false },
+            // PL2: zone1_pillar at x = 1430..1540, top tier 420 (90px step-up from PL1 510)
+            { type: 'pillar', x: 1430, y: 420, w: 110, flipX: true },
 
-            // Section 4: Climb in the air (zone1_plat_small, one-way, w: 160 each, step 90px, gap 55px)
-            { type: 'small', x: 1155, y: 420, w: 160, oneWay: true }, // P1 tier 420
-            { type: 'small', x: 1370, y: 330, w: 160, oneWay: true }, // P2 tier 330 (the peak)
+            // Section 6: The Abyss Floating Route (all one-way, gaps 55px, steps 90px):
+            // F1: zone1_plat_small at x = 1595..1705, tier 330 (gap 55 from PL2, step up 90)
+            { type: 'small', x: 1595, y: 330, w: 110, oneWay: true },
+            // F2: zone1_plat_medium (the summit, walkable 256px) at x = 1760..2016, tier 240 (gap 55 from F1, step up 90)
+            { type: 'medium', x: 1760, y: 240, w: 256, oneWay: true, ceiling: false },
+            // F3: zone1_plat_small at x = 2071..2181, tier 330 (gap 55 from F2, step down 90)
+            { type: 'small', x: 2071, y: 330, w: 110, oneWay: true },
+            // F4: falling_platform at x = 2236..2346, tier 420 (gap 55 from F3, step down 90; shakes 0.5s, falls, respawns)
+            { type: 'fallingPlatform', x: 2236, y: 420, w: 110, isFalling: true },
+            // F5: zone1_plat_small at x = 2401..2511, tier 510 (gap 55 from F4, step down 90)
+            { type: 'small', x: 2401, y: 510, w: 110, oneWay: true },
 
-            // Section 5: Descent with zone1_plat_tiny (one-way, w: 96 each, step 90px, gap 55px)
-            { type: 'tiny', x: 1585, y: 420, w: 96, oneWay: true },  // T1 tier 420
-            { type: 'tiny', x: 1736, y: 510, w: 96, oneWay: true },  // T2 tier 510
-
-            // Section 8: Three zone1_plat_tiny stepping stones across the open pit
-            { type: 'tiny', x: 2445, y: 510, w: 96, oneWay: true },  // Stone A tier 510 (gap from ground: 45px)
-            { type: 'tiny', x: 2596, y: 420, w: 96, oneWay: true },  // Stone B tier 420 (gap: 55px, step: 90px)
-            { type: 'tiny', x: 2747, y: 510, w: 96, oneWay: true },  // Stone C tier 510 (gap: 55px, step: -90px)
-
-            // Base Ground Slab 2 (2890 to 4700) (gap from Stone C: 47px)
-            { type: 'ground', x: 2890, y: 600, w: 1810 }
+            // Ground Slab 2: Ground resumes at x = 2566 (gap 55 from F5, step down 90) to world end (4400)
+            { type: 'ground', x: 2566, y: 600, w: 1834 }
         ],
 
         telegraphedHazards: [
-            // Section 11: Blade zone A - patrolSaw 1 rolling slowly (~x1.0 speed) over 170px range (3550 to 3720)
-            {
-                id: 'patrol_saw_3_1',
-                type: 'patrolSaw',
-                hazardType: 'saw',
-                x: 3550,
-                y: 555,
-                radius: 45,
-                axis: 'horizontal',
-                distance: 170,
-                duration: 2500
-            },
-            // Section 13: Blade zone B - patrolSaw 2 rolling slowly (~x1.0 speed) over 230px range (4100 to 4330)
-            {
-                id: 'patrol_saw_3_2',
-                type: 'patrolSaw',
-                hazardType: 'saw',
-                x: 4100,
-                y: 555,
-                radius: 45,
-                axis: 'horizontal',
-                distance: 230,
-                duration: 2800
-            }
-        ],
-
-        spikes: [
-            // Section 2: Floor spike strip S1 (spikes asset, about 120px wide, x: 640 to 760)
-            { x: 700, y: 600, width: 120, height: 45, side: 'floor' },
-
-            // Section 6: Floor spike strip S2 (spikes asset, about 70px wide, x: 1380 to 1450) under the peak
-            { x: 1415, y: 600, width: 70, height: 45, side: 'floor' },
-
-            // Section 9: Floor spike strip S3 (spikes asset, about 90px wide, x: 3150 to 3240)
-            { x: 3195, y: 600, width: 90, height: 45, side: 'floor' }
-        ],
-
-        decor: [
-            // Safe start decor (x: 0 to 500)
-            { type: 'decor_rocks', x: 220, y: 600 },
-            { type: 'decor_rocks', x: 440, y: 600 },
-
-            // Rest area decor before pit (x: 1900 to 2400)
-            { type: 'decor_rocks', x: 1960, y: 600 },
-            { type: 'decor_rocks', x: 2320, y: 600 },
-
-            // Flat ground decor between pit and saws (x: 2890 to 3500)
-            { type: 'decor_rocks', x: 3000, y: 600 },
-            { type: 'decor_rocks', x: 3380, y: 600 },
-
-            // Rest area decor between saws (x: 3760 to 4060)
-            { type: 'decor_rocks', x: 3910, y: 600 },
-
-            // Near goal decor (x: 4400 to 4700)
-            { type: 'decor_rocks', x: 4620, y: 600 },
-
-            // Background ceiling stalactites (safe overhead decor)
-            { type: 'decor_stalactite', x: 340, y: 30 },
-            { type: 'decor_stalactite', x: 2050, y: 30 },
-            { type: 'decor_stalactite', x: 3850, y: 30 }
-        ],
-
-        goal: { x: 4550, y: 600 },
-
-        hints: [
-            { triggerX: 100,  text: 'Level 3: Pillar Steps! Scale the tiny platforms and watch for rolling saws!' },
-            { triggerX: 580,  text: 'Leap over the wide spike strip ahead!' },
-            { triggerX: 950,  text: 'Hop onto the stone step to reach the floating stairs!' },
-            { triggerX: 2050, text: '🚩 CHECKPOINT SAVED!' },
-            { triggerX: 2360, text: '⚠️ ABYSS CHASM: Hop across the tiny stepping stones to cross!' },
-            { triggerX: 3450, text: '⚠️ PATROL SAW: Time your leap across the rolling blade!' },
-            { triggerX: 4020, text: '⚠️ Another rolling blade! Clear it to reach the goal flag!' }
-        ]
-    },
-
-    // ========================================================================
-    // LEVEL 4: Spike Valley (5300 px wide) - Pillar Mountain & Quad Saws
-    // ========================================================================
-    {
-        id: 4,
-        name: 'Level 4: Spike Valley',
-        worldWidth: 5300,
-        worldHeight: 720,
-        bgTint: 0xffffff,
-        playerStart: { x: 140, y: 568 },
-
-        checkpoints: [
-            // Section 6: Checkpoint flag at x: 2250 (at least 250px flat ground before and after)
-            { id: 'cp_mid4', x: 2250, y: 600 }
-        ],
-
-        zones: [],
-
-        pits: [], // NO pit in this level
-
-        platforms: [
-            // 1. Continuous Base Ground across the entire level (0 to 5300)
-            { type: 'ground', x: 0, y: 600, w: 5300 },
-
-            // 5. Pillar Mountain: Five solid pillars touching each other (2px overlap, 90px steps)
-            // PL1 (x: 1400 to 1512, top 510)
-            { type: 'pillar', x: 1400, y: 510, w: 112, flipX: false },
-            // PL2 (x: 1510 to 1622, top 420)
-            { type: 'pillar', x: 1510, y: 420, w: 112, flipX: true },
-            // PL3 (x: 1620 to 1732, top 330, the peak)
-            { type: 'pillar', x: 1620, y: 330, w: 112, flipX: false },
-            // PL4 (x: 1730 to 1842, top 420)
-            { type: 'pillar', x: 1730, y: 420, w: 112, flipX: true },
-            // PL5 (x: 1840 to 1952, top 510)
-            { type: 'pillar', x: 1840, y: 510, w: 112, flipX: false },
-
-            // 9. Short Pillar Step PL6 (x: 3500 to 3610, top 510, w: 110)
-            { type: 'pillar', x: 3500, y: 510, w: 110, flipX: false },
-
-            // 10. Air Bypass over Saw C: Two one-way small platforms at tier 420 (gap: 55px)
-            // Plat A (x: 3665 to 3825, w: 160)
-            { type: 'small', x: 3665, y: 420, w: 160, oneWay: true },
-            // Plat B (x: 3880 to 4040, w: 160)
-            { type: 'small', x: 3880, y: 420, w: 160, oneWay: true }
-        ],
-
-        telegraphedHazards: [
-            // 3. Saw A (patrolSaw), slow (~x1.0 speed), range 200px (x: 850 to 1050)
+            // Section 3: Saw A (patrolSaw), speed x1.0, range 140px (x = 820..960, danger extent 780..1000)
             {
                 id: 'patrol_saw_4_1',
                 type: 'patrolSaw',
                 hazardType: 'saw',
-                x: 850,
+                x: 820,
                 y: 560,
                 radius: 40,
                 axis: 'horizontal',
-                distance: 200,
-                duration: 2600
+                distance: 140,
+                duration: 2500
             },
-            // 7. Saw B (patrolSaw), ~x1.05 speed, range 160px (x: 2540 to 2700)
+            // Section 11: Saw B (patrolSaw), speed x1.05, range 170px (x = 3420..3590, danger extent 3380..3630)
             {
                 id: 'patrol_saw_4_2',
                 type: 'patrolSaw',
                 hazardType: 'saw',
-                x: 2540,
+                x: 3420,
                 y: 560,
                 radius: 40,
                 axis: 'horizontal',
-                distance: 160,
-                duration: 2000
-            },
-            // 11. Saw C (patrolSaw), ~x1.1 speed, range 180px (x: 3760 to 3940)
-            {
-                id: 'patrol_saw_4_3',
-                type: 'patrolSaw',
-                hazardType: 'saw',
-                x: 3760,
-                y: 560,
-                radius: 40,
-                axis: 'horizontal',
-                distance: 180,
-                duration: 1800
-            },
-            // 12. Saw D (patrolSaw), ~x1.1 speed, range 150px (x: 4270 to 4420)
-            {
-                id: 'patrol_saw_4_4',
-                type: 'patrolSaw',
-                hazardType: 'saw',
-                x: 4270,
-                y: 560,
-                radius: 40,
-                axis: 'horizontal',
-                distance: 150,
-                duration: 1600
+                distance: 170,
+                duration: 2380
             }
         ],
 
         spikes: [
-            // 2. Floor spike strip S1 (55px wide, x: 550 to 605)
-            { x: 578, y: 600, width: 55, height: 45, side: 'floor' },
+            // Section 12: ONE honest floor spike strip S1: 70px wide at x = 3850..3920 (unique width, tiled)
+            {
+                id: 'spike_4_s1',
+                x: 3885,
+                y: 600,
+                width: 70,
+                height: 45,
+                side: 'floor'
+            }
+        ],
 
-            // 8. Floor spike strip S2 (135px wide, x: 3000 to 3135)
-            { x: 3068, y: 600, width: 135, height: 45, side: 'floor' },
-
-            // 13. Floor spike strip S3 (85px wide, x: 4710 to 4795)
-            { x: 4753, y: 600, width: 85, height: 45, side: 'floor' }
+        pranks: [
+            // 1. Speech Sign 1: Spawn intro
+            {
+                id: 'speech_sign_4_1',
+                type: 'speechSign',
+                x: 190,
+                y: 600,
+                text: 'Pahaad ki chadhai. Seedhi raah.'
+            },
+            // 2. PRANK 1: stalactiteDrop (outrun type): landX: 620, triggerX: 450, tellMs: 330, hangY: 50
+            {
+                id: 'stalactite_drop_4_1',
+                type: 'stalactiteDrop',
+                x: 620,
+                landX: 620,
+                landY: 600,
+                hangY: 50,
+                triggerX: 450,
+                tellMs: 330,
+                accel: 2400,
+                maxSpeed: 1100
+            },
+            // 3. Speech Sign 2: Before climb & CP1
+            {
+                id: 'speech_sign_4_2',
+                type: 'speechSign',
+                x: 1060,
+                y: 600,
+                text: 'Upar jao.'
+            },
+            // 4. Speech Sign 3: On the summit F2
+            {
+                id: 'speech_sign_4_3',
+                type: 'speechSign',
+                x: 1810,
+                y: 240,
+                text: 'Summit! Ab bas utarna hai.'
+            },
+            // 5. PRANK 2: stalactiteDrop (wait type): landX: 2126 (center of F3), landY: 330, triggerPlatform F2, triggerX: 1960, tellMs: 330
+            {
+                id: 'stalactite_drop_4_2',
+                type: 'stalactiteDrop',
+                x: 2126,
+                landX: 2126,
+                landY: 330,
+                hangY: 90,
+                triggerPlatform: { x: 1760, y: 240, w: 256 },
+                triggerX: 1960,
+                tellMs: 330,
+                accel: 2400,
+                maxSpeed: 1100
+            },
+            // 6. PRANK 3: wallAppear: x = 3140..3230, height 90, triggerX: 2950, tellMs: 330, fadeMs: 150
+            {
+                id: 'wall_appear_4_1',
+                type: 'wallAppear',
+                x: 3140,
+                y: 600,
+                w: 90,
+                h: 90,
+                triggerX: 2950,
+                tellMs: 330,
+                fadeMs: 150
+            }
         ],
 
         decor: [
-            // Ground rocks along safe sections (flush on ground surface, never floating)
-            { type: 'decor_rocks', x: 220, y: 600 },
-            { type: 'decor_rocks', x: 740, y: 600 },
-            { type: 'decor_rocks', x: 1250, y: 600 },
-            { type: 'decor_rocks', x: 2100, y: 600 },
-            { type: 'decor_rocks', x: 2420, y: 600 },
-            { type: 'decor_rocks', x: 2880, y: 600 },
-            { type: 'decor_rocks', x: 3350, y: 600 },
-            { type: 'decor_rocks', x: 4150, y: 600 },
-            { type: 'decor_rocks', x: 4580, y: 600 },
-            { type: 'decor_rocks', x: 4950, y: 600 },
-            { type: 'decor_rocks', x: 5180, y: 600 },
+            // Ground rocks along flat stretches (never in pit, flush on ground surface)
+            { type: 'decor_rocks', x: 90, y: 600 },
+            { type: 'decor_rocks', x: 300, y: 600 },
+            { type: 'decor_rocks', x: 1220, y: 600 },
+            { type: 'decor_rocks', x: 2650, y: 600 },
+            { type: 'decor_rocks', x: 2850, y: 600 },
+            { type: 'decor_rocks', x: 3320, y: 600 },
+            { type: 'decor_rocks', x: 3720, y: 600 },
+            { type: 'decor_rocks', x: 4020, y: 600 },
+            { type: 'decor_rocks', x: 4280, y: 600 },
 
-            // Hanging stalactites near ceiling (background decor, clear of player jumps)
-            { type: 'decor_stalactite', x: 340, y: 30 },
-            { type: 'decor_stalactite', x: 1280, y: 30 },
-            { type: 'decor_stalactite', x: 2360, y: 30 },
-            { type: 'decor_stalactite', x: 3420, y: 30 },
-            { type: 'decor_stalactite', x: 4520, y: 30 },
-            { type: 'decor_stalactite', x: 5120, y: 30 }
+            // Small decor stalactites (strictly >= 150px from paths, platforms, and pranks at 620 and 2126)
+            { type: 'decor_stalactite', x: 350, y: 30 },
+            { type: 'decor_stalactite', x: 1050, y: 30 },
+            { type: 'decor_stalactite', x: 2700, y: 30 },
+            { type: 'decor_stalactite', x: 3500, y: 30 },
+            { type: 'decor_stalactite', x: 4200, y: 30 }
         ],
 
-        goal: { x: 5050, y: 600 },
+        goal: { x: 4150, y: 600 },
 
         hints: [
-            { triggerX: 100,  text: 'Level 4: Spike Valley! Scale the Pillar Mountain and time the quad saws.' },
-            { triggerX: 1300, text: '⛰️ PILLAR MOUNTAIN: Leap up the solid stone steps to cross!' },
-            { triggerX: 2150, text: '🚩 CHECKPOINT SAVED!' },
-            { triggerX: 3420, text: 'Take the high platform route over Saw C, or time your ground leap!' }
+            { triggerX: 100,  text: 'Level 4: Pahaad ki Chadhai. Seedhi raah, par pahaad ooncha hai.' },
+            { triggerX: 1060, text: 'Upar jao. The Abyss lies ahead.' },
+            { triggerX: 1800, text: 'Summit! Ab bas utarna hai.' },
+            { triggerX: 2700, text: '🚩 CHECKPOINT SAVED!' },
+            { triggerX: 3000, text: 'Gate hurdle and saw blade timing ahead!' },
+            { triggerX: 4000, text: 'Goal ahead! Final sprint to victory!' }
         ]
     },
 
@@ -582,6 +733,69 @@ var GAME_LEVELS = [
             { x: 4650, y: 600, width: 120, height: 45, side: 'floor' }
         ],
 
+        pranks: [
+            // 1. Fake Hazard: Harmless illusion mossy spike (x: 380, w: 40)
+            {
+                id: 'fake_hazard_5_1',
+                type: 'fakeHazard',
+                x: 380,
+                y: 600,
+                w: 40,
+                height: 45,
+                bubbleText: 'Relax... this is a breather! 🌿'
+            },
+            // 2. Stalactite Drop 1 (Outrun Type): Drops as player clears hurdle W1 (x: 1080, triggerX: 950)
+            {
+                id: 'stalactite_drop_5_1',
+                type: 'stalactiteDrop',
+                x: 1080,
+                landX: 1080,
+                landY: 600,
+                hangY: 90,
+                triggerX: 950,
+                tellMs: 330,
+                accel: 2400,
+                maxSpeed: 1100
+            },
+            // 3. Speech Sign 1 before Checkpoint 1 (x: 1620)
+            {
+                id: 'speech_sign_5_1',
+                type: 'speechSign',
+                x: 1620,
+                y: 600,
+                text: 'No tricks here. Take a breath.'
+            },
+            // 4. Speech Sign 2 on Island M2 over chasm (x: 2512)
+            {
+                id: 'speech_sign_5_2',
+                type: 'speechSign',
+                x: 2512,
+                y: 420,
+                text: 'Nice view from up here, right? 🏞️'
+            },
+            // 5. Stalactite Drop 2 (Wait Type): Drops as player approaches Saw B (x: 4040, triggerX: 3810)
+            {
+                id: 'stalactite_drop_5_2',
+                type: 'stalactiteDrop',
+                x: 4040,
+                landX: 4040,
+                landY: 600,
+                hangY: 90,
+                triggerX: 3810,
+                tellMs: 330,
+                accel: 2400,
+                maxSpeed: 1100
+            },
+            // 6. Speech Sign 3 before Goal (x: 4850)
+            {
+                id: 'speech_sign_5_3',
+                type: 'speechSign',
+                x: 4850,
+                y: 600,
+                text: 'Made it! No fake gates this time. 🟢'
+            }
+        ],
+
         decor: [
             // Ground rocks along safe sections (never in or near pit, never overlapping hazards)
             { type: 'decor_rocks', x: 280, y: 600 },
@@ -593,19 +807,14 @@ var GAME_LEVELS = [
             { type: 'decor_rocks', x: 4500, y: 600 },
             { type: 'decor_rocks', x: 5100, y: 600 },
 
-            // Hanging stalactites near the top (2-3 trap hazards that drop when player approaches)
-            { type: 'decor_stalactite', x: 350, y: 30 },
-            { type: 'decor_stalactite', x: 750, y: 30 },
-            { type: 'decor_stalactite', x: 1080, y: 30, trap: true }, // Trap 1: drops as player clears hurdle W1
+            // Hanging decoration stalactites (small decor asset, strictly >= 150px from paths, platforms, and pranks)
+            { type: 'decor_stalactite', x: 180, y: 30 },
+            { type: 'decor_stalactite', x: 600, y: 30 },
+            { type: 'decor_stalactite', x: 1450, y: 30 },
             { type: 'decor_stalactite', x: 1950, y: 30 },
-            { type: 'decor_stalactite', x: 2328, y: 30 },
-            { type: 'decor_stalactite', x: 2640, y: 30, trap: true }, // Trap 2: drops as player reaches Island M2 in pit!
-            { type: 'decor_stalactite', x: 2952, y: 30 },
-            { type: 'decor_stalactite', x: 3300, y: 30 },
-            { type: 'decor_stalactite', x: 3640, y: 30 },
-            { type: 'decor_stalactite', x: 4050, y: 30, trap: true }, // Trap 3: drops as player vaults hurdle W2
-            { type: 'decor_stalactite', x: 4500, y: 30 },
-            { type: 'decor_stalactite', x: 4900, y: 30 }
+            { type: 'decor_stalactite', x: 3350, y: 30 },
+            { type: 'decor_stalactite', x: 4450, y: 30 },
+            { type: 'decor_stalactite', x: 5150, y: 30 }
         ],
 
         goal: { x: 5000, y: 600 },
@@ -723,6 +932,54 @@ var GAME_LEVELS = [
             { x: 5400, y: 600, width: 75, height: 45, side: 'floor' }
         ],
 
+        pranks: [
+            // 1. Fake Hazard: Harmless illusion spike strip (x: 380, w: 50)
+            {
+                id: 'fake_hazard_6_1',
+                type: 'fakeHazard',
+                x: 380,
+                y: 600,
+                w: 50,
+                height: 45,
+                bubbleText: 'Bouncy machinery ahead! ⚙️'
+            },
+            // 2. Shift Platform: HP2 shifts forward when player lands on HP1
+            {
+                id: 'shift_platform_6_1',
+                type: 'shiftPlatform',
+                platform: { x: 1950, y: 330, w: 160 },
+                triggerPlatform: { x: 1640, y: 330, w: 256 },
+                tellMs: 340,
+                dx: 45,
+                dy: 0,
+                slideMs: 350
+            },
+            // 3. Hidden Popup Spikes: After landing from the chasm bounce pad (x: 3380, triggerX: 3260)
+            {
+                id: 'popup_spikes_6_1',
+                type: 'popupSpikes',
+                x: 3380,
+                y: 600,
+                width: 60,
+                height: 45,
+                triggerX: 3260,
+                tellDuration: 340,
+                riseDuration: 90
+            },
+            // 4. Rising Gate Hurdle: Wall appears before the final goal (x: 5600..5690, triggerX: 5350)
+            {
+                id: 'wall_appear_6_1',
+                type: 'wallAppear',
+                x: 5600,
+                y: 600,
+                w: 90,
+                h: 90,
+                triggerX: 5350,
+                tellMs: 340,
+                fadeMs: 150
+            }
+        ],
+
         decor: [
             // Ground rocks along safe sections (never in or near pit, never overlapping hazards)
             { type: 'decor_rocks', x: 250, y: 600 },
@@ -735,7 +992,7 @@ var GAME_LEVELS = [
             { type: 'decor_rocks', x: 4250, y: 600 },
             { type: 'decor_rocks', x: 4680, y: 600 },
             { type: 'decor_rocks', x: 5250, y: 600 },
-            { type: 'decor_rocks', x: 5620, y: 600 },
+            { type: 'decor_rocks', x: 5720, y: 600 },
             { type: 'decor_rocks', x: 5880, y: 600 },
 
             // Hanging stalactites from ceiling (strictly outside hazards, jumps, player, and pad flight arcs)
@@ -754,7 +1011,7 @@ var GAME_LEVELS = [
             { type: 'decor_stalactite', x: 5880, y: 30 }
         ],
 
-        goal: { x: 5750, y: 600 },
+        goal: { x: 5850, y: 600 },
 
         hints: [
             { triggerX: 100,  text: 'Level 6: Moving Machinery! Step onto bounce pads to propel skyward!' },
@@ -762,7 +1019,8 @@ var GAME_LEVELS = [
             { triggerX: 2500, text: '🚩 CHECKPOINT SAVED!' },
             { triggerX: 2850, text: '⚠️ PAD-ASSISTED CHASM: Launch from the pad and hold RIGHT to clear the pit!' },
             { triggerX: 4560, text: '🚩 CHECKPOINT SAVED!' },
-            { triggerX: 4700, text: 'Watch the rapid saw patrol timing and sprint through cleanly!' }
+            { triggerX: 4700, text: 'Watch the rapid saw patrol timing and sprint through cleanly!' },
+            { triggerX: 5500, text: 'Clear the rising gate and enter the victory vortex!' }
         ]
     },
 
@@ -866,6 +1124,51 @@ var GAME_LEVELS = [
             { x: 5430, y: 600, width: 100, height: 45, side: 'floor' }
         ],
 
+        pranks: [
+            // 1. Fake Hazard: Harmless illusion spike strip (x: 360, w: 40)
+            {
+                id: 'fake_hazard_7_1',
+                type: 'fakeHazard',
+                x: 360,
+                y: 600,
+                w: 40,
+                height: 45,
+                bubbleText: 'Gravity Core ahead! Mind your head! 🌀'
+            },
+            // 2. Speech Sign on Ceiling Slab (x: 2600, y: 130)
+            {
+                id: 'speech_sign_7_1',
+                type: 'speechSign',
+                x: 2600,
+                y: 130,
+                text: 'Walking on the ceiling feels unnatural... but good!'
+            },
+            // 3. Wall Appear: Rising gate after exiting Flip Zone (x: 3620..3710, triggerX: 3440)
+            {
+                id: 'wall_appear_7_1',
+                type: 'wallAppear',
+                x: 3620,
+                y: 600,
+                w: 90,
+                h: 90,
+                triggerX: 3440,
+                tellMs: 340,
+                fadeMs: 150
+            },
+            // 4. Hidden Popup Spikes: Right before the Goal (x: 5630, triggerX: 5530)
+            {
+                id: 'popup_spikes_7_1',
+                type: 'popupSpikes',
+                x: 5630,
+                y: 600,
+                width: 70,
+                height: 45,
+                triggerX: 5530,
+                tellDuration: 340,
+                riseDuration: 90
+            }
+        ],
+
         decor: [
             // Ground rocks along safe sections (never in or near pit, never overlapping hazards)
             { type: 'decor_rocks', x: 250, y: 600 },
@@ -879,7 +1182,7 @@ var GAME_LEVELS = [
             { type: 'decor_rocks', x: 4420, y: 600 },
             { type: 'decor_rocks', x: 4780, y: 600 },
             { type: 'decor_rocks', x: 5280, y: 600 },
-            { type: 'decor_rocks', x: 5650, y: 600 },
+            { type: 'decor_rocks', x: 5710, y: 600 },
             { type: 'decor_rocks', x: 5950, y: 600 },
 
             // Hanging stalactites only outside the flip section and above y=130
@@ -997,6 +1300,50 @@ var GAME_LEVELS = [
             { x: 6850, y: 600, width: 95, height: 45, side: 'floor' }
         ],
 
+        pranks: [
+            // 1. Fake Hazard: Harmless illusion spike strip (x: 420, w: 40)
+            {
+                id: 'fake_hazard_8_1',
+                type: 'fakeHazard',
+                x: 420,
+                y: 600,
+                w: 40,
+                height: 45,
+                bubbleText: 'Twin inversions ahead! Think upside-down! 🦇'
+            },
+            // 2. Speech Sign between twin strips (x: 950)
+            {
+                id: 'speech_sign_8_1',
+                type: 'speechSign',
+                x: 950,
+                y: 600,
+                text: 'Safe landing spot! Good eye.'
+            },
+            // 3. Shifting Platform on Lower Pit Island I2 (triggerPlatform: I1)
+            {
+                id: 'shift_platform_8_1',
+                type: 'shiftPlatform',
+                platform: { x: 3060, y: 480, w: 240 },
+                triggerPlatform: { x: 2740, y: 510, w: 240 },
+                tellMs: 340,
+                dx: 40,
+                dy: 0,
+                slideMs: 350
+            },
+            // 4. Rising Gate Hurdle before Goal (x: 7080..7170, triggerX: 6880)
+            {
+                id: 'wall_appear_8_1',
+                type: 'wallAppear',
+                x: 7080,
+                y: 600,
+                w: 90,
+                h: 90,
+                triggerX: 6880,
+                tellMs: 340,
+                fadeMs: 150
+            }
+        ],
+
         telegraphedHazards: [
             // Floor patrol saw A: x 1450 to 1660 (patrol 210px @ x1.0, danger extent 1410 to 1700)
             { type: 'patrolSaw', hazardType: 'saw', x: 1450, y: 560, axis: 'horizontal', distance: 210, speedMultiplier: 1.0, radius: 40, duration: 2100 },
@@ -1022,7 +1369,7 @@ var GAME_LEVELS = [
             { type: 'decor_rocks', x: 5950, y: 600 },
             { type: 'decor_rocks', x: 6100, y: 600 },
             { type: 'decor_rocks', x: 6780, y: 600 },
-            { type: 'decor_rocks', x: 7080, y: 600 },
+            { type: 'decor_rocks', x: 7200, y: 600 },
 
             // Hanging stalactites: atmospheric falling + 3 dynamic trap drops when player approaches
             { type: 'decor_stalactite', x: 550, y: 30 },
@@ -1036,7 +1383,7 @@ var GAME_LEVELS = [
             { type: 'decor_stalactite', x: 7100, y: 30 }
         ],
 
-        goal: { x: 7200, y: 600 },
+        goal: { x: 7300, y: 600 },
 
         hints: [
             { triggerX: 100,  text: 'Level 8: Ceiling Runner! Enter the cavern and master twin inversions!' },
@@ -1166,6 +1513,39 @@ var GAME_LEVELS = [
             { x: 6150, y: 600, width: 95, height: 45, side: 'floor' }
         ],
 
+        pranks: [
+            // 1. Fake Hazard: Harmless illusion spike strip after intro pit (x: 620, w: 40)
+            {
+                id: 'fake_hazard_9_1',
+                type: 'fakeHazard',
+                x: 620,
+                y: 600,
+                w: 40,
+                height: 45,
+                bubbleText: 'Surviving the fall? Don\'t relax yet! ⏳'
+            },
+            // 2. Speech Sign before Chain Pit (x: 3500)
+            {
+                id: 'speech_sign_9_1',
+                type: 'speechSign',
+                x: 3500,
+                y: 600,
+                text: 'The falling chain awaits. Leap with conviction!'
+            },
+            // 3. Wall Appear: Rising gate hurdle before the final goal (x: 6950..7040, triggerX: 6780)
+            {
+                id: 'wall_appear_9_1',
+                type: 'wallAppear',
+                x: 6950,
+                y: 600,
+                w: 90,
+                h: 90,
+                triggerX: 6780,
+                tellMs: 340,
+                fadeMs: 150
+            }
+        ],
+
         decor: [
             // Start Island decor rocks
             { type: 'decor_rocks', x: 200, y: 600 },
@@ -1178,7 +1558,7 @@ var GAME_LEVELS = [
             { type: 'decor_rocks', x: 4350, y: 600 },
             { type: 'decor_rocks', x: 5900, y: 600 },
             { type: 'decor_rocks', x: 6400, y: 600 },
-            { type: 'decor_rocks', x: 6900, y: 600 },
+            { type: 'decor_rocks', x: 6870, y: 600 },
 
             // Hanging stalactites only above y = 130, never over pit routes, never in flip section lower area
             { type: 'decor_stalactite', x: 200, y: 30 },
@@ -1189,7 +1569,7 @@ var GAME_LEVELS = [
             { type: 'decor_stalactite', x: 6800, y: 30 }
         ],
 
-        goal: { x: 7050, y: 600 },
+        goal: { x: 7180, y: 600 },
 
         hints: [
             { triggerX: 100,  text: 'Level 9: Falling Sands! Leap across the collapsing platform to cross the pit!' },
@@ -1197,7 +1577,8 @@ var GAME_LEVELS = [
             { triggerX: 3250, text: '🚩 CHECKPOINT 2 SAVED! Dangerous collapsing chain ahead — maintain your momentum!' },
             { triggerX: 4650, text: '🚩 CHECKPOINT 3 SAVED! Invert gravity to cross the floor spike field!' },
             { triggerX: 4850, text: '⬆ INVERT: Press F or tap FLIP to run along the ceiling!' },
-            { triggerX: 6950, text: 'Goal ahead! Final sprint to victory!' }
+            { triggerX: 6750, text: 'Clear the rising gate and sprint to the victory vortex!' },
+            { triggerX: 7050, text: 'Goal ahead! Final sprint to victory!' }
         ]
     }
 ];
