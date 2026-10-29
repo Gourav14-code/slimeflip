@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Trust Trap - Psychological Thriller Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #090514;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-box {
+            width: 100%;
+            max-width: 480px;
+            height: 100%;
+            max-height: 850px;
+            background: linear-gradient(135deg, #150a24, #05020a);
+            border: 2px solid #2a1b4e;
+            box-shadow: 0 0 40px rgba(0, 255, 204, 0.1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 25px;
+            box-sizing: border-box;
+            transition: background 0.5s, border-color 0.5s;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 15px;
+        }
+        .stat {
+            font-size: 14px;
+            letter-spacing: 1px;
+            color: #a0a0c0;
+        }
+        .stat span {
+            color: #00ffcc;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        #center-display {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        #companion-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: #1e1236;
+            border: 3px solid #00ffcc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 50px;
+            margin-bottom: 25px;
+            box-shadow: 0 0 20px rgba(0,255,204,0.3);
+            transition: 0.3s;
+        }
+        #dialogue-box {
+            background: rgba(25, 15, 45, 0.8);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 16px;
+            line-height: 1.6;
+            min-height: 80px;
+            margin-bottom: 25px;
+            width: 100%;
+            box-sizing: border-box;
+            color: #d0d0e0;
+        }
+        .action-area {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+        }
+        .btn {
+            flex: 1;
+            background: linear-gradient(45deg, #00ffcc, #0077ff);
+            border: none;
+            color: #05020a;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0,255,204,0.3);
+            transition: 0.2s;
+        }
+        .btn:active {
+            transform: scale(0.96);
+        }
+        .danger-btn {
+            background: linear-gradient(45deg, #ff0055, #ff5500) !important;
+            color: #fff !important;
+            box-shadow: 0 0 20px rgba(255,0,85,0.5) !important;
+        }
+        /* Betrayal Mode Styles */
+        .betrayal-mode {
+            background: linear-gradient(135deg, #2c050a, #0a0102) !important;
+            border-color: #ff0055 !important;
+            box-shadow: 0 0 50px rgba(255, 0, 85, 0.4) !important;
+        }
+        .betrayal-mode #companion-avatar {
+            border-color: #ff0055 !important;
+            box-shadow: 0 0 30px rgba(255,0,85,0.7) !important;
+            animation: shake 0.2s infinite;
+        }
+        .betrayal-mode #dialogue-box {
+            border-color: #ff0055 !important;
+            color: #ff88a2;
+        }
+        @keyframes shake {
+            0% { transform: translate(2px, 2px); }
+            50% { transform: translate(-2px, -2px); }
+            100% { transform: translate(2px, -2px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-box">
+        <header>
+            <div class="stat">LEVEL: <span id="level-num">1</span></div>
+            <div class="stat">TRUST METER: <span id="trust-val">20%</span></div>
+        </header>
+
+        <div id="center-display">
+            <div id="companion-avatar">🤖</div>
+            <div id="dialogue-box">
+                "Hello traveler! Main tumhara AI guide hoon. Is secure zone ko build karne mein meri madad karo, hum dono milkar yahan safe rahenge."
+            </div>
+        </div>
+
+        <div class="action-area" id="button-container">
+            <button class="btn" onclick="makeChoice('trust')">Bovosa Karo (Trust)</button>
+            <button class="btn" onclick="makeChoice('question')">Sawal Poocho</button>
+        </div>
+    </div>
+
+    <script>
+        let level = 1;
+        let trust = 20;
+        let gameStage = 'normal'; // 'normal' or 'betrayal'
+
+        const dialogues = {
+            1: {
+                text: "“Shukriya dost! Tumne mujhpar bharosa kiya. Yeh lo extra energy crystals, hamara trust level badh raha hai.”",
+                avatar: "🤖",
+                trustGain: 30
+            },
+            2: {
+                text: "“Hamari bonding kitni achi ho rahi hai na? Dekho baaki saare zones khatam ho chuke hain, bas humara zone bacha hai.”",
+                avatar: "😊",
+                trustGain: 40
+            },
+            3: { // The Sudden Twist / Betrayal Stage
+                text: "“Moorakh! Tumne sach mein soch liya ki main tumhara dost hoon? Tumhara sara data aur control ab mere paas hai. GAME OVER hone wala hai!”",
+                avatar: "⚠️",
+                isBetrayal: true
+            }
+        };
+
+        function makeChoice(action) {
+            const box = document.getElementById('game-box');
+            const dialogueBox = document.getElementById('dialogue-box');
+            const avatar = document.getElementById('companion-avatar');
+            const levelEl = document.getElementById('level-num');
+            const trustEl = document.getElementById('trust-val');
+            const btnContainer = document.getElementById('button-container');
+
+            if (gameStage === 'betrayal') {
+                // If user reacts during betrayal attack
+                if (action === 'defend') {
+                    alert("Gjab! Tumne achanak hue attack ko rok liya aur system hack karke jeet gaye!");
+                    location.reload();
+                } else {
+                    alert("Dohkha! Tumhara trust le dooba. TUM HAR GAYE!");
+                    location.reload();
+                }
+                return;
+            }
+
+            // Normal Progression (Building False Trust)
+            level++;
+            if (level <= 3) {
+                let currentData = dialogues[level];
+                levelEl.innerText = level;
+                trust += currentData.trustGain;
+                if (trust > 100) trust = 100;
+                trustEl.innerText = trust + "%";
+                avatar.innerText = currentData.avatar;
+                dialogueBox.innerText = currentData.text;
+
+                if (currentData.isBetrayal) {
+                    // TRIGGER SUDDEN BETRAYAL!
+                    gameStage = 'betrayal';
+                    box.classList.add('betrayal-mode');
+                    trustEl.innerText = "0% (CRITICAL)";
+                    trustEl.style.color = "#ff0055";
+                    
+                    // Change buttons to panic choices
+                    btnContainer.innerHTML = `
+                        <button class="btn danger-btn" onclick="makeChoice('defend')">🛡️ DEFEND NOW!</button>
+                        <button class="btn" onclick="makeChoice('surrender')">🏃 RUN AWAY</button>
+                    `;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
