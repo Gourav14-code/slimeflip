@@ -54,7 +54,7 @@ This log records user requests, dates, and corresponding execution summaries for
 ### Prompt 6: Asset Location Reminder
 - **User Prompt:**
   > "asset es folder me ha - C:\ug\assets\zone1"
-- **Status:** Verified all assets in `assets/zone1/` (`zone1_ground_long`, `zone1_ceiling`, `zone1_plat_small`, `spikes`, `goal_vortex_tall`, etc.).
+- **Status:** Verified all assets in `assets/zone1/` (`zone1_ground_long`, `zone1_ceiling`, `zone1_plat_small`, `spikes`, `Stone_Arch_Portal.png.png`, etc.).
 
 ### Prompt 7: Build Level 1
 - **User Prompt:**
@@ -102,6 +102,16 @@ This log records user requests, dates, and corresponding execution summaries for
      - Open chasm pit (x:880..1060) prevents floor crossing; player uses Gravity Flip Zone (x:660..1460) to flip to ceiling (y:130) and complete the level.
   5. Verified with `node tools/selftest.js` -> 0 warnings, 0 errors, PASS.
   6. Bumped cache-busters in `index.html`.
+
+### Prompt 14: Verification of Saved Conversations & Git Push
+- **User Prompt:**
+  > "thik h ye btao humari sab baat chit jo humn save krne i thi fil m kr di save or kon se name se ye btao and sare code push kro git pr"
+- **Status:** Answered with explicit file names (`USER_PROMPTS_LOG.md` and `PROJECT_STATE.md`) and workflows. Committed all code and pushed to `main` branch (`commit 19b8745`).
+
+### Prompt 15: Confirmation of Real-Time Up-to-Date Sync
+- **User Prompt:**
+  > "chat huamri last one tak save ho gyi mean abhi tak"
+- **Status:** Confirmed: Yes, updated this log up to the present moment and pushed to GitHub main branch. Complete continuity guaranteed.
 
 ---
 
