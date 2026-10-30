@@ -39,111 +39,79 @@ if (typeof window !== 'undefined') {
 
 var GAME_LEVELS = [
     // ========================================================================
-    // LEVEL 1: Crystal Cavern (2800 px wide) - Prank Traps (Level Devil Style)
+    // LEVEL 1: The Tease (1600 px wide) - Poki / Level Devil Micro-Level
     // ========================================================================
     {
         id: 1,
-        name: 'Level 1: Crystal Cavern',
-        worldWidth: 2800,
+        name: 'Level 1: The Tease',
+        worldWidth: 1600,
         worldHeight: 720,
         bgTint: 0xffffff,
-        playerStart: { x: 140, y: 568 },
+        playerStart: { x: 120, y: 568 },
 
         checkpoints: [],
 
-        zones: [],
+        zones: [
+            // Gravity Flip Zone (660 to 1460, w: 800)
+            { id: 'flip_zone_1', type: 'flipZone', x: 660, y: 0, width: 800, height: 720 }
+        ],
 
         pits: [
-            // Section 7: ONE open pit (120px wide, x: 1840 to 1960)
-            { x: 1840, w: 120 }
+            // Open Chasm Pit (180px wide, x: 880 to 1060)
+            { x: 880, w: 180 }
         ],
 
         platforms: [
-            // Base Ground Slab 1 (0 to 600)
-            { type: 'ground', x: 0, y: 600, w: 600 },
+            // Safe spacious starting ground slab (0 to 880) - NO awkward spikes or clumping at spawn!
+            { type: 'ground', x: 0, y: 600, w: 880 },
 
-            // Running Floor (600 to 1000) is defined in pranks array and connected as ground
+            // Inverted Ceiling Slab (620 to 1500, flat bottom at y = 130)
+            { type: 'ceiling', x: 620, y: 130, w: 880 },
 
-            // Base Ground Slab 2 (1000 to 1840)
-            { type: 'ground', x: 1000, y: 600, w: 840 },
-
-            // Base Ground Slab 3 (1960 to 2800)
-            { type: 'ground', x: 1960, y: 600, w: 840 }
+            // Landing ground slab after pit (1060 to 1600)
+            { type: 'ground', x: 1060, y: 600, w: 540 }
         ],
 
         telegraphedHazards: [],
 
-        spikes: [
-            // Section 9: ONE honest floor spike strip, 60px wide (x: 2210 to 2270, center 2240)
-            // Exactly 250px of flat ground before it (2210 - 1960 = 250px)
-            { x: 2240, y: 600, width: 60, height: 45, side: 'floor' }
-        ],
+        spikes: [],
 
         pranks: [
-            // 1. Running Floor (x: 600 to 1000, 8 tiles of 50px)
             {
-                id: 'running_floor_1',
-                type: 'runningFloor',
-                x: 600,
+                id: 'speech_sign_1_1',
+                type: 'speechSign',
+                x: 240,
                 y: 600,
-                w: 400,
-                tileCount: 8,
-                tileWidth: 50,
-                firstDelay: 350,
-                stepDelay: 220,
-                shakeDuration: 100
+                text: 'Welcome to Slime Flip!'
             },
-            // 2. Pop-up Spikes (x: 1380 to 1480, 100px wide, center 1430)
-            {
-                id: 'popup_spikes_1',
-                type: 'popupSpikes',
-                x: 1430,
-                y: 600,
-                width: 100,
-                height: 45,
-                triggerX: 1340,
-                tellDuration: 250,
-                riseDuration: 90
-            },
-            // 3. Runaway Goal (x: 2500, hops to 2720)
             {
                 id: 'runaway_goal_1',
                 type: 'runawayGoal',
-                x: 2500,
+                x: 800,
                 y: 600,
-                triggerDist: 160,
-                hopDist: 220,
-                targetX: 2720,
-                speechText: 'Hehe, catch me!'
+                triggerDist: 180,
+                hopDist: 550,
+                targetX: 1350,
+                targetY: 184, // y = 130 + 54 = 184 (flush with ceiling)
+                speechText: 'Hehe, upar aao! 🙃'
             }
         ],
 
         decor: [
-            // Ground rocks along safe sections (never in or near pit)
-            { type: 'decor_rocks', x: 260, y: 600 },
-            { type: 'decor_rocks', x: 480, y: 600 },
-            { type: 'decor_rocks', x: 1120, y: 600 },
-            { type: 'decor_rocks', x: 1650, y: 600 },
-            { type: 'decor_rocks', x: 2020, y: 600 },
-            { type: 'decor_rocks', x: 2400, y: 600 },
-            { type: 'decor_rocks', x: 2760, y: 600 },
-
-            // Hanging stalactites near the top (background decoration only)
-            { type: 'decor_stalactite', x: 400, y: 30 },
-            { type: 'decor_stalactite', x: 1200, y: 30 },
-            { type: 'decor_stalactite', x: 1750, y: 30 },
-            { type: 'decor_stalactite', x: 2350, y: 30 }
+            { type: 'decor_rocks', x: 340, y: 600 },
+            { type: 'decor_rocks', x: 500, y: 600 },
+            { type: 'decor_rocks', x: 1200, y: 600 }
         ],
 
-        goal: { x: 2500, y: 600 },
+        goal: { x: 800, y: 600 },
 
         hints: [
-            { triggerX: 100,  text: 'Level 1: Crystal Cavern! Run with Arrow Keys or A/D, Jump with SPACE or ▲.' }
+            { triggerX: 80,  text: 'Run with Arrow Keys or A/D, Jump with SPACE / ▲!' },
+            { triggerX: 620, text: 'Gravity Flip Zone! Tap FLIP or ▲ to walk on the ceiling!' }
         ]
     },
 
-    // ========================================================================
-    // LEVEL 2: Ancient Slabs (3500 px wide) - Prank Traps (Level Devil Style)
+        // LEVEL 2: Ancient Slabs (3500 px wide) - Prank Traps (Level Devil Style)
     // ========================================================================
     {
         id: 2,

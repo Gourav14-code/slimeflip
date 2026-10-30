@@ -160,7 +160,7 @@ Every level must strictly obey these deterministic constraints to guarantee sati
 
 | Level | Level Name / Theme | Width ($px$) | Hazard Count | Max Gap % | Max Gap ($px$) | Checkpoints | Flip Sections | Role / Pacing |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **L1** | Crystal Cavern (Level Devil Pranks) | 2800 | 2 | 40% | 58 px | 0 | 0 | Intro, running floor & prank traps |
+| **L1** | **First Contact** | 2800 | 1 | 40% | 58 px | 0 | 1 | Intro, jump step, first gravity flip, wall hurdle & runaway goal |
 | **L2** | Ancient Slabs | 3500 | 2 | 42% | 61 px | 1 | 0 | Small platform steps |
 | **L3** | Sky Islands | 5400 | 2 | 45% | 65 px | 1 | 1 | Floating sky islands, gravity betrayal & shifting stone |
 | **L4** | Pahaad ki Chadhai | 4400 | 3 | 47% | 68 px | 2 | 0 | Two saws, one spike strip, the abyss, stalactite drops & rising gate |

@@ -43,6 +43,8 @@
             bounce_pad_down: 'assets/zone1/bounce_pad_down.png',
             checkpoint_flag: 'assets/zone1/checkpoint_flag.png',
             goal_flag: 'assets/zone1/goal_flag.png',
+            goal_portal: 'assets/zone1/Stone_Arch_Portal.png.png',
+            Stone_Arch_Portal: 'assets/zone1/Stone_Arch_Portal.png.png',
             zone1_signpost: 'assets/zone1/zone1_signpost.png'
         },
         decor: {

@@ -77,21 +77,21 @@ var ANIM = {
 
 // Calibrated Black Hole Goal Vortex Constants (Exact flag size silhouette: 60x95px)
 var ANIM_GOAL = {
-    WIDTH: 60,
-    HEIGHT: 95,
-    HOLE_OFFSET_Y: -5,             // Offset from center to black hole core center (~45% from top)
-    BREATH_SCALE_MIN: 0.98,
+    WIDTH: 96,
+    HEIGHT: 108,
+    HOLE_OFFSET_Y: 10,             // Center of the arch doorway in Stone_Arch_Portal
+    BREATH_SCALE_MIN: 0.97,
     BREATH_SCALE_MAX: 1.03,
-    BREATH_DURATION: 1800,         // ms
-    SWIRL_WIDTH: 52,
-    SWIRL_HEIGHT: 62,
-    SWIRL_ROT_SPEED: 60,           // deg/sec
-    SWIRL_ALPHA: 0.55,
-    CORE_WIDTH: 22,
-    CORE_HEIGHT: 26,
+    BREATH_DURATION: 1400,         // ms
+    SWIRL_WIDTH: 48,
+    SWIRL_HEIGHT: 56,
+    SWIRL_ROT_SPEED: 70,           // deg/sec
+    SWIRL_ALPHA: 0.65,
+    CORE_WIDTH: 24,
+    CORE_HEIGHT: 28,
     PULL_RADIUS: 180,
     PULL_MAX_TILT: 8,              // max degrees slime tilts toward hole
-    TRIGGER_DIST_X: 35,
+    TRIGGER_DIST_X: 45,
     ENTER_DURATION: 1250           // ms
 };
 
@@ -3073,7 +3073,8 @@ class GameScene extends Phaser.Scene {
         this.load.image('bounce_pad_down', 'assets/zone1/bounce_pad_down.png');
         this.load.image('checkpoint_flag', 'assets/zone1/checkpoint_flag.png');
         this.load.image('goal_flag', 'assets/zone1/goal_flag.png');
-        this.load.image('goal_vortex_tall', 'assets/zone1/goal_vortex_tall.png');
+        this.load.image('goal_vortex_tall', 'assets/zone1/Stone_Arch_Portal.png.png');
+        this.load.image('Stone_Arch_Portal', 'assets/zone1/Stone_Arch_Portal.png.png');
         this.load.image('obs_turret', 'assets/zone1/obs_turret.png');
         this.load.image('obs_bullet', 'assets/zone1/obs_bullet.png');
         this.load.image('obs_conveyor', 'assets/zone1/obs_conveyor.png');
@@ -3513,7 +3514,7 @@ class GameScene extends Phaser.Scene {
         const goalPos = levelData.goal || { x: worldW - 150, y: GROUND_TOP_Y };
         const groundTop = goalPos.y || GROUND_TOP_Y;
         const goalFlagY = groundTop - (ANIM_GOAL.HEIGHT / 2); // 600 - 47.5 = 552.5, resting flush on ground
-        const goalTex = isVortexGoal ? (this.textures.exists('goal_vortex_tall') ? 'goal_vortex_tall' : 'goal_flag') : 'goal_flag';
+        const goalTex = isVortexGoal ? (this.textures.exists('Stone_Arch_Portal') ? 'Stone_Arch_Portal' : (this.textures.exists('goal_vortex_tall') ? 'goal_vortex_tall' : 'goal_flag')) : 'goal_flag';
 
         this.goal = this.physics.add.sprite(goalPos.x, goalFlagY, goalTex);
         this.goal.setDisplaySize(ANIM_GOAL.WIDTH, ANIM_GOAL.HEIGHT);
@@ -3835,11 +3836,8 @@ class GameScene extends Phaser.Scene {
                 const fillW = Math.max(0, fillRight - fillLeft);
                 const fillCenterX = fillLeft + fillW / 2;
                 const fillH = 720 - walkTop; // Fill from walkTop, no gap under ground tile asset
-                if (fillH > 0 && fillW > 0) {
-                    const rockFill = this.add.rectangle(fillCenterX, walkTop + fillH / 2, fillW, fillH, 0x141024);
-                    rockFill.setDepth(2);
-                    this.platformVisualsGroup.add(rockFill);
-                }
+                // Black shadow rectangle removed for clean visuals:
+                // Natural background art extends cleanly below ground tile
 
                 // 2. Seamless Ground Tiling with Natural Hand-Drawn Rounded End Caps
                 const tileW = 512;
@@ -7202,6 +7200,7 @@ class GameScene extends Phaser.Scene {
             const groundTop = (this.levelData.goal && this.levelData.goal.y) ? this.levelData.goal.y : GROUND_TOP_Y;
             const landY = groundTop - (this.goal.displayHeight / 2);
             this.goal.y = landY;
+            if (this.goal.setFlipY) this.goal.setFlipY(false);
             if (this.goal.refreshBody) this.goal.refreshBody();
             this.goalHoleX = this.goal.origGoalX;
             this.goalHoleY = landY + (ANIM_GOAL.HOLE_OFFSET_Y || -5);
@@ -7209,6 +7208,9 @@ class GameScene extends Phaser.Scene {
                 this.goalSwirl1.x = this.goal.origGoalX;
                 this.goalSwirl2.x = this.goal.origGoalX;
                 this.goalCore.x = this.goal.origGoalX;
+                this.goalSwirl1.y = this.goalHoleY;
+                this.goalSwirl2.y = this.goalHoleY;
+                this.goalCore.y = this.goalHoleY;
             }
         }
     }
@@ -7649,43 +7651,53 @@ class GameScene extends Phaser.Scene {
 
                     const groundTop = (this.levelData.goal && this.levelData.goal.y) ? this.levelData.goal.y : GROUND_TOP_Y;
                     const landY = groundTop - (this.goal.displayHeight / 2);
+                    const isCeilingHop = (runawayPrank.targetY !== undefined);
+                    const finalY = isCeilingHop ? runawayPrank.targetY : landY;
 
-                // Permanent forward translation on X (NO yoyo on X!)
+                // Permanent translation to target position
                 this.tweens.add({
                     targets: this.goal,
                     x: targetGoalX,
+                    y: finalY,
                     duration: 380,
                     ease: 'Quad.easeOut',
                     onUpdate: () => {
                         if (this.goal && this.goal.body) this.goal.refreshBody();
                         if (this.goalHoleX !== undefined) this.goalHoleX = this.goal.x;
+                        if (this.goalHoleY !== undefined) this.goalHoleY = this.goal.y;
                     },
                     onComplete: () => {
                         if (this.goal && this.goal.body) this.goal.refreshBody();
                         if (this.goalHoleX !== undefined) this.goalHoleX = this.goal.x;
-                    }
-                });
-
-                // Arc jump in Y (jump up 65px and land back down at landY)
-                this.tweens.add({
-                    targets: this.goal,
-                    y: landY - 65,
-                    duration: 190,
-                    yoyo: true,
-                    ease: 'Sine.easeOut',
-                    onComplete: () => {
-                        if (this.goal) {
-                            this.goal.y = landY;
-                            if (this.goal.body) this.goal.refreshBody();
-                            if (this.goalHoleY !== undefined) this.goalHoleY = landY + (ANIM_GOAL.HOLE_OFFSET_Y || -5);
+                        if (this.goalHoleY !== undefined) this.goalHoleY = this.goal.y;
+                        if (isCeilingHop && this.goal) {
+                            this.goal.setFlipY(true);
                         }
                     }
                 });
+
+                if (!isCeilingHop) {
+                    this.tweens.add({
+                        targets: this.goal,
+                        y: landY - 65,
+                        duration: 190,
+                        yoyo: true,
+                        ease: 'Sine.easeOut',
+                        onComplete: () => {
+                            if (this.goal) {
+                                this.goal.y = landY;
+                                if (this.goal.body) this.goal.refreshBody();
+                                if (this.goalHoleY !== undefined) this.goalHoleY = landY + (ANIM_GOAL.HOLE_OFFSET_Y || -5);
+                            }
+                        }
+                    });
+                }
 
                 if (this.goalSwirl1) {
                     this.tweens.add({
                         targets: [this.goalSwirl1, this.goalSwirl2, this.goalCore],
                         x: targetGoalX,
+                        y: finalY + (ANIM_GOAL.HOLE_OFFSET_Y || -5),
                         duration: 380,
                         ease: 'Quad.easeOut'
                     });
