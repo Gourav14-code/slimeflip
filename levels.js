@@ -39,37 +39,37 @@ if (typeof window !== 'undefined') {
 
 var GAME_LEVELS = [
     // ========================================================================
-    // LEVEL 1: The Tease (1600 px wide) - Poki / Level Devil Micro-Level
+    // LEVEL 1: The Tease (2400 px wide) - Stretched Run-Up & Vanish Teleport Prank
     // ========================================================================
     {
         id: 1,
         name: 'Level 1: The Tease',
-        worldWidth: 1600,
+        worldWidth: 2400,
         worldHeight: 720,
         bgTint: 0xffffff,
-        playerStart: { x: 120, y: 568 },
+        playerStart: { x: 140, y: 568 },
 
         checkpoints: [],
 
         zones: [
-            // Gravity Flip Zone (660 to 1460, w: 800)
-            { id: 'flip_zone_1', type: 'flipZone', x: 660, y: 0, width: 800, height: 720 }
+            // Gravity Flip Zone (920 to 2260, w: 1340)
+            { id: 'flip_zone_1', type: 'flipZone', x: 920, y: 0, width: 1340, height: 720 }
         ],
 
         pits: [
-            // Open Chasm Pit (180px wide, x: 880 to 1060)
-            { x: 880, w: 180 }
+            // Open Chasm Pit (220px wide, x: 1320 to 1540)
+            { x: 1320, w: 220 }
         ],
 
         platforms: [
-            // Safe spacious starting ground slab (0 to 880) - NO awkward spikes or clumping at spawn!
-            { type: 'ground', x: 0, y: 600, w: 880 },
+            // Safe spacious starting ground slab (0 to 1320) - comfortable run-up and jump feeling
+            { type: 'ground', x: 0, y: 600, w: 1320 },
 
-            // Inverted Ceiling Slab (620 to 1500, flat bottom at y = 130)
-            { type: 'ceiling', x: 620, y: 130, w: 880 },
+            // Inverted Ceiling Slab (880 to 2320, flat bottom at y = 130)
+            { type: 'ceiling', x: 880, y: 130, w: 1440 },
 
-            // Landing ground slab after pit (1060 to 1600)
-            { type: 'ground', x: 1060, y: 600, w: 540 }
+            // Landing ground slab after pit (1540 to 2400)
+            { type: 'ground', x: 1540, y: 600, w: 860 }
         ],
 
         telegraphedHazards: [],
@@ -80,34 +80,35 @@ var GAME_LEVELS = [
             {
                 id: 'speech_sign_1_1',
                 type: 'speechSign',
-                x: 240,
+                x: 260,
                 y: 600,
                 text: 'Welcome to Slime Flip!'
             },
             {
                 id: 'runaway_goal_1',
                 type: 'runawayGoal',
-                x: 800,
+                x: 1160,
                 y: 600,
                 triggerDist: 180,
-                hopDist: 550,
-                targetX: 1350,
+                hopDist: 900,
+                targetX: 2060,
                 targetY: 184, // y = 130 + 54 = 184 (flush with ceiling)
                 speechText: 'Hehe, upar aao! 🙃'
             }
         ],
 
         decor: [
-            { type: 'decor_rocks', x: 340, y: 600 },
-            { type: 'decor_rocks', x: 500, y: 600 },
-            { type: 'decor_rocks', x: 1200, y: 600 }
+            { type: 'decor_rocks', x: 420, y: 600 },
+            { type: 'decor_rocks', x: 740, y: 600 },
+            { type: 'decor_rocks', x: 1000, y: 600 },
+            { type: 'decor_rocks', x: 1750, y: 600 }
         ],
 
-        goal: { x: 800, y: 600 },
+        goal: { x: 1160, y: 600 },
 
         hints: [
             { triggerX: 80,  text: 'Run with Arrow Keys or A/D, Jump with SPACE / ▲!' },
-            { triggerX: 620, text: 'Gravity Flip Zone! Tap FLIP or ▲ to walk on the ceiling!' }
+            { triggerX: 880, text: 'Gravity Flip Zone! Tap FLIP or ▲ to invert gravity and walk on the ceiling!' }
         ]
     },
 

@@ -7195,11 +7195,14 @@ class GameScene extends Phaser.Scene {
         }
         if (this.goal && this.goal.origGoalX) {
             this.tweens.killTweensOf(this.goal);
+            if (this.goalSwirl1) this.tweens.killTweensOf([this.goalSwirl1, this.goalSwirl2, this.goalCore]);
             this.goal.hasEscaped = false;
             this.goal.x = this.goal.origGoalX;
             const groundTop = (this.levelData.goal && this.levelData.goal.y) ? this.levelData.goal.y : GROUND_TOP_Y;
             const landY = groundTop - (this.goal.displayHeight / 2);
             this.goal.y = landY;
+            this.goal.setScale(1.0, 1.0);
+            this.goal.setAlpha(1.0);
             if (this.goal.setFlipY) this.goal.setFlipY(false);
             if (this.goal.refreshBody) this.goal.refreshBody();
             this.goalHoleX = this.goal.origGoalX;
@@ -7211,6 +7214,9 @@ class GameScene extends Phaser.Scene {
                 this.goalSwirl1.y = this.goalHoleY;
                 this.goalSwirl2.y = this.goalHoleY;
                 this.goalCore.y = this.goalHoleY;
+                this.goalSwirl1.setScale(1.0, 1.0).setAlpha(ANIM_GOAL.SWIRL_ALPHA || 0.85);
+                this.goalSwirl2.setScale(0.85, 0.85).setAlpha((ANIM_GOAL.SWIRL_ALPHA || 0.85) * 0.5);
+                this.goalCore.setScale(1.0, 1.0).setAlpha(1.0);
             }
         }
     }
@@ -7633,7 +7639,7 @@ class GameScene extends Phaser.Scene {
             });
         }
 
-        // 4. Runaway Goal Prank: Leap forward 220px on an arc, permanent forward relocation!
+        // 4. Runaway Goal Prank: Magical vanish and re-spawn teleportation (no flying through air!)
         if (this.goal && !this.goal.hasEscaped && !this.isDead && !this.hasWon) {
             const runawayPrank = (this.levelData.pranks || []).find(p => p.type === 'runawayGoal');
             if (runawayPrank) {
@@ -7644,67 +7650,86 @@ class GameScene extends Phaser.Scene {
 
                 if (distToGoal > 0 && distToGoal < triggerDist) {
                     this.goal.hasEscaped = true;
-                    if (typeof soundManager !== 'undefined' && soundManager.playBounce) {
-                        soundManager.playBounce();
+
+                    // 1. Play magical vanish sound & particles at current floor position
+                    if (typeof soundManager !== 'undefined') {
+                        soundManager.playTone(520, 180, 0.22, 'triangle', 0.25);
                     }
-                    this.showGoalSpeechBubble(this.goal.x + hopDist * 0.5, runawayPrank.speechText || "Hehe, catch me!", 1500);
+                    if (this.slimeParticles) {
+                        this.slimeParticles.emitParticleAt(this.goal.x, this.goal.y, 16);
+                    }
+                    this.showGoalSpeechBubble(this.goal.x, runawayPrank.speechText || "Hehe, upar aao! 🙃", 1600);
 
                     const groundTop = (this.levelData.goal && this.levelData.goal.y) ? this.levelData.goal.y : GROUND_TOP_Y;
                     const landY = groundTop - (this.goal.displayHeight / 2);
                     const isCeilingHop = (runawayPrank.targetY !== undefined);
                     const finalY = isCeilingHop ? runawayPrank.targetY : landY;
 
-                // Permanent translation to target position
-                this.tweens.add({
-                    targets: this.goal,
-                    x: targetGoalX,
-                    y: finalY,
-                    duration: 380,
-                    ease: 'Quad.easeOut',
-                    onUpdate: () => {
-                        if (this.goal && this.goal.body) this.goal.refreshBody();
-                        if (this.goalHoleX !== undefined) this.goalHoleX = this.goal.x;
-                        if (this.goalHoleY !== undefined) this.goalHoleY = this.goal.y;
-                    },
-                    onComplete: () => {
-                        if (this.goal && this.goal.body) this.goal.refreshBody();
-                        if (this.goalHoleX !== undefined) this.goalHoleX = this.goal.x;
-                        if (this.goalHoleY !== undefined) this.goalHoleY = this.goal.y;
-                        if (isCeilingHop && this.goal) {
-                            this.goal.setFlipY(true);
-                        }
-                    }
-                });
+                    // 2. Shrink & implosion animation: Portal vanishes from floor into nothingness
+                    const shrinkTargets = [this.goal];
+                    if (this.goalSwirl1) shrinkTargets.push(this.goalSwirl1, this.goalSwirl2, this.goalCore);
 
-                if (!isCeilingHop) {
                     this.tweens.add({
-                        targets: this.goal,
-                        y: landY - 65,
-                        duration: 190,
-                        yoyo: true,
-                        ease: 'Sine.easeOut',
+                        targets: shrinkTargets,
+                        scaleX: 0,
+                        scaleY: 0,
+                        alpha: 0,
+                        duration: 220,
+                        ease: 'Back.easeIn',
                         onComplete: () => {
-                            if (this.goal) {
-                                this.goal.y = landY;
-                                if (this.goal.body) this.goal.refreshBody();
-                                if (this.goalHoleY !== undefined) this.goalHoleY = landY + (ANIM_GOAL.HOLE_OFFSET_Y || -5);
+                            if (!this.goal || this.isDead || this.hasWon) return;
+
+                            // 3. Relocate instantly to target position while completely invisible
+                            this.goal.setPosition(targetGoalX, finalY);
+                            if (isCeilingHop) {
+                                this.goal.setFlipY(true);
+                            }
+                            if (this.goal.body) this.goal.refreshBody();
+                            this.goalHoleX = targetGoalX;
+                            this.goalHoleY = finalY + (isCeilingHop ? -(ANIM_GOAL.HOLE_OFFSET_Y || -5) : (ANIM_GOAL.HOLE_OFFSET_Y || -5));
+
+                            if (this.goalSwirl1) {
+                                this.goalSwirl1.setPosition(targetGoalX, this.goalHoleY);
+                                this.goalSwirl2.setPosition(targetGoalX, this.goalHoleY);
+                                this.goalCore.setPosition(targetGoalX, this.goalHoleY);
+                            }
+
+                            // 4. Play magical spawn sound & burst at destination
+                            if (typeof soundManager !== 'undefined') {
+                                soundManager.playTone(220, 680, 0.26, 'sine', 0.25);
+                            }
+                            if (this.slimeParticles) {
+                                this.slimeParticles.emitParticleAt(targetGoalX, finalY, 18);
+                            }
+
+                            // 5. Expand & materialize into existence at destination with elastic snap
+                            this.tweens.add({
+                                targets: this.goal,
+                                scaleX: 1.0,
+                                scaleY: 1.0,
+                                alpha: 1.0,
+                                duration: 280,
+                                ease: 'Back.easeOut',
+                                onComplete: () => {
+                                    if (this.goal && this.goal.body) this.goal.refreshBody();
+                                }
+                            });
+
+                            if (this.goalSwirl1) {
+                                this.tweens.add({
+                                    targets: [this.goalSwirl1, this.goalSwirl2, this.goalCore],
+                                    scaleX: 1.0,
+                                    scaleY: 1.0,
+                                    alpha: 1.0,
+                                    duration: 280,
+                                    ease: 'Back.easeOut'
+                                });
                             }
                         }
                     });
                 }
-
-                if (this.goalSwirl1) {
-                    this.tweens.add({
-                        targets: [this.goalSwirl1, this.goalSwirl2, this.goalCore],
-                        x: targetGoalX,
-                        y: finalY + (ANIM_GOAL.HOLE_OFFSET_Y || -5),
-                        duration: 380,
-                        ease: 'Quad.easeOut'
-                    });
-                }
             }
         }
-    }
 
         // Vortex Goal Idle Animation & Pull Feel
         if (this.isVortexGoal && this.goal && this.player && !this.isDead) {

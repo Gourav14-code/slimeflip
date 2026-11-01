@@ -22,15 +22,14 @@
 - `USER_PROMPTS_LOG.md`: Date-wise log of all user prompts and actions.
 
 ## 4. Current Level Status
-- **Level 1 ("The Tease" - 1600px):** COMPLETED -> Clean, logical, high-energy Poki / Level Devil micro-level.
-  - Starting area (0..660px) is completely flat, safe, and spacious (zero awkward spikes or floating platforms at spawn).
-  - Goal uses `Stone_Arch_Portal.png.png` (96x108) with animated breathing, rotating energy vortex swirls in archway, and orbiting magic particles.
-  - Portal sits on ground at x:800. Approaching x:600 triggers gotcha leap to ceiling (x:1350, y:184).
-  - Open pit (x:880..1060) blocks ground; player uses Gravity Flip Zone (x:660..1460) to flip onto ceiling (y:130) and clear the level.
-  - Ground black shadow rectangle (`0x141024`) removed.
+- **Level 1 ("The Tease" - 2400px):** COMPLETED -> Stretched, spacious run-up with magical portal teleportation.
+  - Starting area (0..1320px) is completely flat and open for running and jumping.
+  - Goal uses `Stone_Arch_Portal.png.png` at x:1160 on the floor.
+  - Runaway goal gotcha: Portal disappears with implosion shrink + audio + slime particles, then instantly spawns upside down on ceiling (x:2060, y:184) with expansion burst + particles (no flying through the air).
+  - Open pit (x:1320..1540, 220px) blocks the floor; player uses Gravity Flip Zone (x:920..2260) to flip onto ceiling (y:130) to reach the portal.
 - **Levels 2 to 9:** Complete, tested, fully operational.
 - **Levels 10 to 30:** Planned in `LEVEL_DESIGN.md`.
 
-## 5. Active Task
-- Verified (`node tools/selftest.js` PASS, 0 warnings).
-- Server active on port 8000 (`python -m http.server 8000`).
+## 5. Active Task & Roadmap
+- Level 1 stretch & vanish/spawn teleport complete (`node tools/selftest.js` PASS, 0 warnings).
+- Next up: Splash Screen & Menu / Level Select flow for Android mobile release (Studio Splash -> Main Menu / Candy Crush style curved zone map -> Level Select).
