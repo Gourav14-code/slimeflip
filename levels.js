@@ -39,12 +39,12 @@ if (typeof window !== 'undefined') {
 
 var GAME_LEVELS = [
     // ========================================================================
-    // LEVEL 1: The Tease (2400 px wide) - Stretched Run-Up & Vanish Teleport Prank
+    // LEVEL 1: The Tease (3200 px wide) - Continuous Ground & Level Devil Trap Saga
     // ========================================================================
     {
         id: 1,
         name: 'Level 1: The Tease',
-        worldWidth: 2400,
+        worldWidth: 3200,
         worldHeight: 720,
         bgTint: 0xffffff,
         playerStart: { x: 140, y: 568 },
@@ -52,24 +52,18 @@ var GAME_LEVELS = [
         checkpoints: [],
 
         zones: [
-            // Gravity Flip Zone (920 to 2260, w: 1340)
-            { id: 'flip_zone_1', type: 'flipZone', x: 920, y: 0, width: 1340, height: 720 }
+            // Gravity Flip Zone (920 to 2120, w: 1200)
+            { id: 'flip_zone_1', type: 'flipZone', x: 920, y: 0, width: 1200, height: 720 }
         ],
 
-        pits: [
-            // Open Chasm Pit (220px wide, x: 1320 to 1540)
-            { x: 1320, w: 220 }
-        ],
+        pits: [], // Continuous ground - ZERO gap under feet!
 
         platforms: [
-            // Safe spacious starting ground slab (0 to 1320) - comfortable run-up and jump feeling
-            { type: 'ground', x: 0, y: 600, w: 1320 },
+            // Continuous solid ground slab across entire level (0 to 3200) - completely flat, safe, no gaps!
+            { type: 'ground', x: 0, y: 600, w: 3200 },
 
-            // Inverted Ceiling Slab (880 to 2320, flat bottom at y = 130)
-            { type: 'ceiling', x: 880, y: 130, w: 1440 },
-
-            // Landing ground slab after pit (1540 to 2400)
-            { type: 'ground', x: 1540, y: 600, w: 860 }
+            // Inverted Ceiling Slab (880 to 2170, flat bottom at y = 130, extends >20px beyond flip zone on both sides)
+            { type: 'ceiling', x: 880, y: 130, w: 1290 }
         ],
 
         telegraphedHazards: [],
@@ -89,26 +83,55 @@ var GAME_LEVELS = [
                 type: 'runawayGoal',
                 x: 1160,
                 y: 600,
-                triggerDist: 180,
-                hopDist: 900,
-                targetX: 2060,
-                targetY: 184, // y = 130 + 54 = 184 (flush with ceiling)
-                speechText: 'Hehe, upar aao! 🙃'
+                stages: [
+                    {
+                        triggerDist: 180,
+                        targetX: 1950,
+                        targetY: 184, // Ceiling (flush at y: 130 + 54)
+                        speechText: 'Hehe, upar aao! 🙃'
+                    },
+                    {
+                        triggerDist: 180,
+                        targetX: 2950,
+                        targetY: 546, // Floor (600 - 54)
+                        speechText: 'Arey neeche dekho! 🏃‍♂️💨'
+                    }
+                ]
+            },
+            {
+                id: 'speech_sign_1_2',
+                type: 'speechSign',
+                x: 2240,
+                y: 600,
+                text: 'Bas thoda aur... sambhal ke! 😈'
+            },
+            {
+                id: 'popup_spikes_1',
+                type: 'popupSpikes',
+                x: 2520,
+                y: 600,
+                width: 60,
+                height: 45,
+                triggerX: 2380,
+                tellDuration: 330,
+                riseDuration: 180
             }
         ],
 
         decor: [
             { type: 'decor_rocks', x: 420, y: 600 },
             { type: 'decor_rocks', x: 740, y: 600 },
-            { type: 'decor_rocks', x: 1000, y: 600 },
-            { type: 'decor_rocks', x: 1750, y: 600 }
+            { type: 'decor_rocks', x: 1400, y: 600 },
+            { type: 'decor_rocks', x: 1750, y: 600 },
+            { type: 'decor_rocks', x: 2600, y: 600 }
         ],
 
         goal: { x: 1160, y: 600 },
 
         hints: [
-            { triggerX: 80,  text: 'Run with Arrow Keys or A/D, Jump with SPACE / ▲!' },
-            { triggerX: 880, text: 'Gravity Flip Zone! Tap FLIP or ▲ to invert gravity and walk on the ceiling!' }
+            { triggerX: 80,   text: 'Run with Arrow Keys or A/D, Jump with SPACE / ▲!' },
+            { triggerX: 880,  text: 'Gravity Flip Zone! Tap FLIP or ▲ to walk on the ceiling!' },
+            { triggerX: 2100, text: 'Tap FLIP or ▼ to drop back down to the ground!' }
         ]
     },
 

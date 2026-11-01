@@ -22,14 +22,16 @@
 - `USER_PROMPTS_LOG.md`: Date-wise log of all user prompts and actions.
 
 ## 4. Current Level Status
-- **Level 1 ("The Tease" - 2400px):** COMPLETED -> Stretched, spacious run-up with magical portal teleportation.
-  - Starting area (0..1320px) is completely flat and open for running and jumping.
-  - Goal uses `Stone_Arch_Portal.png.png` at x:1160 on the floor.
-  - Runaway goal gotcha: Portal disappears with implosion shrink + audio + slime particles, then instantly spawns upside down on ceiling (x:2060, y:184) with expansion burst + particles (no flying through the air).
-  - Open pit (x:1320..1540, 220px) blocks the floor; player uses Gravity Flip Zone (x:920..2260) to flip onto ceiling (y:130) to reach the portal.
+- **Level 1 ("The Tease" - 3200px):** COMPLETED -> Continuous solid ground with multi-stage Level Devil saga.
+  - Starting ground is 100% solid and continuous (0..3200px) with ZERO pits or gaps under feet.
+  - Initial portal sits on floor at x:1160 (`Stone_Arch_Portal.png.png`, clean art without swirl overlays).
+  - Gotcha 1: Approaching x:980 causes portal to vanish and spawn upside down on ceiling at x:1950 (`Hehe, upar aao! 🙃`).
+  - Gotcha 2: Player flips to ceiling and approaches x:1780 -> Portal vanishes from ceiling and spawns back on the floor at x:2950 (`Arey neeche dekho! 🏃‍♂️💨`).
+  - Level Devil Trap Section: Ceiling ends at x:2170, player lands on ground, sees warning sign at x:2240 (`Bas thoda aur... sambhal ke! 😈`), and dodges sudden popup spikes (x:2520, w:60) before reaching the final victory portal at x:2950.
 - **Levels 2 to 9:** Complete, tested, fully operational.
 - **Levels 10 to 30:** Planned in `LEVEL_DESIGN.md`.
 
 ## 5. Active Task & Roadmap
-- Level 1 stretch & vanish/spawn teleport complete (`node tools/selftest.js` PASS, 0 warnings).
+- Level 1 continuous ground & multi-stage Level Devil trap complete (`node tools/selftest.js` PASS, 0 warnings).
+- Git push paused locally as requested.
 - Next up: Splash Screen & Menu / Level Select flow for Android mobile release (Studio Splash -> Main Menu / Candy Crush style curved zone map -> Level Select).

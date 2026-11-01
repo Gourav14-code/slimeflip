@@ -3518,6 +3518,8 @@ class GameScene extends Phaser.Scene {
 
         this.goal = this.physics.add.sprite(goalPos.x, goalFlagY, goalTex);
         this.goal.setDisplaySize(ANIM_GOAL.WIDTH, ANIM_GOAL.HEIGHT);
+        this.goal.origScaleX = this.goal.scaleX;
+        this.goal.origScaleY = this.goal.scaleY;
         this.goal.setDepth(5);
         this.goal.body.setAllowGravity(false);
         this.goal.body.setImmovable(true);
@@ -3533,68 +3535,16 @@ class GameScene extends Phaser.Scene {
             this.goalHoleX = holeX;
             this.goalHoleY = holeY;
 
-            this.goalVortexGroup = this.add.group();
-
-            // Layer a: Backdrop breathing tween
+            // Gentle breathing tween on the Stone Arch Portal (preserves clean portal art with NO heavy swirl overlay)
             this.tweens.add({
                 targets: this.goal,
-                scaleX: { from: this.goal.scaleX * ANIM_GOAL.BREATH_SCALE_MIN, to: this.goal.scaleX * ANIM_GOAL.BREATH_SCALE_MAX },
-                scaleY: { from: this.goal.scaleY * ANIM_GOAL.BREATH_SCALE_MIN, to: this.goal.scaleY * ANIM_GOAL.BREATH_SCALE_MAX },
+                scaleX: { from: this.goal.origScaleX * ANIM_GOAL.BREATH_SCALE_MIN, to: this.goal.origScaleX * ANIM_GOAL.BREATH_SCALE_MAX },
+                scaleY: { from: this.goal.origScaleY * ANIM_GOAL.BREATH_SCALE_MIN, to: this.goal.origScaleY * ANIM_GOAL.BREATH_SCALE_MAX },
                 duration: ANIM_GOAL.BREATH_DURATION,
                 yoyo: true,
                 repeat: -1,
                 ease: 'Sine.easeInOut'
             });
-
-            // Layer b: Swirl overlays
-            if (this.textures.exists('goal_spiral_tex')) {
-                this.goalSwirl1 = this.add.image(holeX, holeY, 'goal_spiral_tex')
-                    .setDisplaySize(ANIM_GOAL.SWIRL_WIDTH, ANIM_GOAL.SWIRL_HEIGHT)
-                    .setBlendMode(Phaser.BlendModes.ADD)
-                    .setAlpha(ANIM_GOAL.SWIRL_ALPHA)
-                    .setDepth(6);
-                this.goalVortexGroup.add(this.goalSwirl1);
-
-                this.goalSwirl2 = this.add.image(holeX, holeY, 'goal_spiral_tex')
-                    .setDisplaySize(ANIM_GOAL.SWIRL_WIDTH * 0.85, ANIM_GOAL.SWIRL_HEIGHT * 0.85)
-                    .setBlendMode(Phaser.BlendModes.ADD)
-                    .setAlpha(ANIM_GOAL.SWIRL_ALPHA * 0.5)
-                    .setDepth(6);
-                this.goalVortexGroup.add(this.goalSwirl2);
-            }
-
-            // Layer c: Inward streaming pooled particles
-            this.goalParticles = [];
-            const particleColors = [0xa855f7, 0x00f2fe, 0xec4899, 0x38ef7d];
-            for (let i = 0; i < 16; i++) {
-                const color = particleColors[i % particleColors.length];
-                const dot = this.add.circle(holeX, holeY, 1.8, color, 0.85).setDepth(6);
-                this.goalVortexGroup.add(dot);
-                this.goalParticles.push({
-                    sprite: dot,
-                    radius: 12 + Math.random() * 20,
-                    angle: (i / 16) * Math.PI * 2 + Math.random() * 0.5,
-                    speed: 1.8 + Math.random() * 1.2
-                });
-            }
-
-            // Layer d: Core
-            if (this.textures.exists('goal_core_tex')) {
-                this.goalCore = this.add.image(holeX, holeY, 'goal_core_tex')
-                    .setDisplaySize(ANIM_GOAL.CORE_WIDTH, ANIM_GOAL.CORE_HEIGHT)
-                    .setDepth(7);
-                this.goalVortexGroup.add(this.goalCore);
-
-                this.tweens.add({
-                    targets: this.goalCore,
-                    scaleX: { from: this.goalCore.scaleX * 0.94, to: this.goalCore.scaleX * 1.08 },
-                    scaleY: { from: this.goalCore.scaleY * 0.94, to: this.goalCore.scaleY * 1.08 },
-                    duration: 1300,
-                    yoyo: true,
-                    repeat: -1,
-                    ease: 'Sine.easeInOut'
-                });
-            }
         } else {
             this.tweens.add({
                 targets: this.goal,
@@ -7195,29 +7145,23 @@ class GameScene extends Phaser.Scene {
         }
         if (this.goal && this.goal.origGoalX) {
             this.tweens.killTweensOf(this.goal);
-            if (this.goalSwirl1) this.tweens.killTweensOf([this.goalSwirl1, this.goalSwirl2, this.goalCore]);
             this.goal.hasEscaped = false;
+            this.goal.escapeStage = 0;
+            this.goal.isTeleporting = false;
             this.goal.x = this.goal.origGoalX;
             const groundTop = (this.levelData.goal && this.levelData.goal.y) ? this.levelData.goal.y : GROUND_TOP_Y;
             const landY = groundTop - (this.goal.displayHeight / 2);
             this.goal.y = landY;
-            this.goal.setScale(1.0, 1.0);
+            if (this.goal.origScaleX !== undefined && this.goal.origScaleY !== undefined) {
+                this.goal.setScale(this.goal.origScaleX, this.goal.origScaleY);
+            } else {
+                this.goal.setDisplaySize(ANIM_GOAL.WIDTH, ANIM_GOAL.HEIGHT);
+            }
             this.goal.setAlpha(1.0);
             if (this.goal.setFlipY) this.goal.setFlipY(false);
             if (this.goal.refreshBody) this.goal.refreshBody();
             this.goalHoleX = this.goal.origGoalX;
             this.goalHoleY = landY + (ANIM_GOAL.HOLE_OFFSET_Y || -5);
-            if (this.goalSwirl1) {
-                this.goalSwirl1.x = this.goal.origGoalX;
-                this.goalSwirl2.x = this.goal.origGoalX;
-                this.goalCore.x = this.goal.origGoalX;
-                this.goalSwirl1.y = this.goalHoleY;
-                this.goalSwirl2.y = this.goalHoleY;
-                this.goalCore.y = this.goalHoleY;
-                this.goalSwirl1.setScale(1.0, 1.0).setAlpha(ANIM_GOAL.SWIRL_ALPHA || 0.85);
-                this.goalSwirl2.setScale(0.85, 0.85).setAlpha((ANIM_GOAL.SWIRL_ALPHA || 0.85) * 0.5);
-                this.goalCore.setScale(1.0, 1.0).setAlpha(1.0);
-            }
         }
     }
 
@@ -7639,94 +7583,89 @@ class GameScene extends Phaser.Scene {
             });
         }
 
-        // 4. Runaway Goal Prank: Magical vanish and re-spawn teleportation (no flying through air!)
-        if (this.goal && !this.goal.hasEscaped && !this.isDead && !this.hasWon) {
+        // 4. Runaway Goal Prank: Magical vanish and re-spawn teleportation (supports single or multi-stage gotchas!)
+        if (this.goal && !this.goal.hasEscaped && !this.isDead && !this.hasWon && !this.goal.isTeleporting) {
             const runawayPrank = (this.levelData.pranks || []).find(p => p.type === 'runawayGoal');
             if (runawayPrank) {
-                const distToGoal = this.goal.x - this.player.x;
-                const triggerDist = (runawayPrank.triggerDist !== undefined) ? runawayPrank.triggerDist : PRANK_TIMING.RUNAWAY_GOAL.TRIGGER_DIST;
-                const hopDist = (runawayPrank.hopDist !== undefined) ? runawayPrank.hopDist : PRANK_TIMING.RUNAWAY_GOAL.HOP_DISTANCE;
-                const targetGoalX = (runawayPrank.targetX !== undefined) ? runawayPrank.targetX : Math.min(this.goal.x + hopDist, (this.levelData.worldWidth || 2800) - 80);
+                const stages = runawayPrank.stages || [runawayPrank];
+                const stageIdx = this.goal.escapeStage || 0;
 
-                if (distToGoal > 0 && distToGoal < triggerDist) {
-                    this.goal.hasEscaped = true;
+                if (stageIdx < stages.length) {
+                    const currentStage = stages[stageIdx];
+                    const distToGoal = this.goal.x - this.player.x;
+                    const triggerDist = (currentStage.triggerDist !== undefined) ? currentStage.triggerDist : PRANK_TIMING.RUNAWAY_GOAL.TRIGGER_DIST;
+                    const hopDist = (currentStage.hopDist !== undefined) ? currentStage.hopDist : PRANK_TIMING.RUNAWAY_GOAL.HOP_DISTANCE;
+                    const targetGoalX = (currentStage.targetX !== undefined) ? currentStage.targetX : Math.min(this.goal.x + hopDist, (this.levelData.worldWidth || 2800) - 80);
 
-                    // 1. Play magical vanish sound & particles at current floor position
-                    if (typeof soundManager !== 'undefined') {
-                        soundManager.playTone(520, 180, 0.22, 'triangle', 0.25);
-                    }
-                    if (this.slimeParticles) {
-                        this.slimeParticles.emitParticleAt(this.goal.x, this.goal.y, 16);
-                    }
-                    this.showGoalSpeechBubble(this.goal.x, runawayPrank.speechText || "Hehe, upar aao! 🙃", 1600);
+                    if (distToGoal > 0 && distToGoal < triggerDist) {
+                        this.goal.escapeStage = stageIdx + 1;
+                        if (this.goal.escapeStage >= stages.length) {
+                            this.goal.hasEscaped = true;
+                        }
+                        this.goal.isTeleporting = true;
 
-                    const groundTop = (this.levelData.goal && this.levelData.goal.y) ? this.levelData.goal.y : GROUND_TOP_Y;
-                    const landY = groundTop - (this.goal.displayHeight / 2);
-                    const isCeilingHop = (runawayPrank.targetY !== undefined);
-                    const finalY = isCeilingHop ? runawayPrank.targetY : landY;
+                        // 1. Play magical vanish sound & particles at current position
+                        if (typeof soundManager !== 'undefined') {
+                            soundManager.playTone(520, 180, 0.22, 'triangle', 0.25);
+                        }
+                        if (this.slimeParticles) {
+                            this.slimeParticles.emitParticleAt(this.goal.x, this.goal.y, 16);
+                        }
+                        this.showGoalSpeechBubble(this.goal.x, currentStage.speechText || "Hehe, catch me! 🙃", 1600);
 
-                    // 2. Shrink & implosion animation: Portal vanishes from floor into nothingness
-                    const shrinkTargets = [this.goal];
-                    if (this.goalSwirl1) shrinkTargets.push(this.goalSwirl1, this.goalSwirl2, this.goalCore);
+                        const groundTop = (this.levelData.goal && this.levelData.goal.y) ? this.levelData.goal.y : GROUND_TOP_Y;
+                        const landY = groundTop - (this.goal.displayHeight / 2);
+                        const isCeilingHop = (currentStage.targetY !== undefined && currentStage.targetY < 300);
+                        const finalY = (currentStage.targetY !== undefined) ? currentStage.targetY : landY;
 
-                    this.tweens.add({
-                        targets: shrinkTargets,
-                        scaleX: 0,
-                        scaleY: 0,
-                        alpha: 0,
-                        duration: 220,
-                        ease: 'Back.easeIn',
-                        onComplete: () => {
-                            if (!this.goal || this.isDead || this.hasWon) return;
+                        // 2. Shrink & implosion animation: Portal vanishes from current position into nothingness
+                        this.tweens.add({
+                            targets: this.goal,
+                            scaleX: 0,
+                            scaleY: 0,
+                            alpha: 0,
+                            duration: 220,
+                            ease: 'Back.easeIn',
+                            onComplete: () => {
+                                if (!this.goal || this.isDead || this.hasWon) return;
 
-                            // 3. Relocate instantly to target position while completely invisible
-                            this.goal.setPosition(targetGoalX, finalY);
-                            if (isCeilingHop) {
-                                this.goal.setFlipY(true);
-                            }
-                            if (this.goal.body) this.goal.refreshBody();
-                            this.goalHoleX = targetGoalX;
-                            this.goalHoleY = finalY + (isCeilingHop ? -(ANIM_GOAL.HOLE_OFFSET_Y || -5) : (ANIM_GOAL.HOLE_OFFSET_Y || -5));
-
-                            if (this.goalSwirl1) {
-                                this.goalSwirl1.setPosition(targetGoalX, this.goalHoleY);
-                                this.goalSwirl2.setPosition(targetGoalX, this.goalHoleY);
-                                this.goalCore.setPosition(targetGoalX, this.goalHoleY);
-                            }
-
-                            // 4. Play magical spawn sound & burst at destination
-                            if (typeof soundManager !== 'undefined') {
-                                soundManager.playTone(220, 680, 0.26, 'sine', 0.25);
-                            }
-                            if (this.slimeParticles) {
-                                this.slimeParticles.emitParticleAt(targetGoalX, finalY, 18);
-                            }
-
-                            // 5. Expand & materialize into existence at destination with elastic snap
-                            this.tweens.add({
-                                targets: this.goal,
-                                scaleX: 1.0,
-                                scaleY: 1.0,
-                                alpha: 1.0,
-                                duration: 280,
-                                ease: 'Back.easeOut',
-                                onComplete: () => {
-                                    if (this.goal && this.goal.body) this.goal.refreshBody();
+                                // 3. Relocate instantly to target position while completely invisible
+                                this.goal.setPosition(targetGoalX, finalY);
+                                if (this.goal.setFlipY) {
+                                    this.goal.setFlipY(isCeilingHop);
                                 }
-                            });
+                                if (this.goal.body) this.goal.refreshBody();
+                                this.goalHoleX = targetGoalX;
+                                this.goalHoleY = finalY;
 
-                            if (this.goalSwirl1) {
+                                // 4. Play magical spawn sound & burst at destination
+                                if (typeof soundManager !== 'undefined') {
+                                    soundManager.playTone(220, 680, 0.26, 'sine', 0.25);
+                                }
+                                if (this.slimeParticles) {
+                                    this.slimeParticles.emitParticleAt(targetGoalX, finalY, 18);
+                                }
+
+                                // 5. Expand & materialize into existence at destination with elastic snap
+                                const targetScaleX = (this.goal.origScaleX !== undefined) ? this.goal.origScaleX : (ANIM_GOAL.WIDTH / (this.goal.width || 1));
+                                const targetScaleY = (this.goal.origScaleY !== undefined) ? this.goal.origScaleY : (ANIM_GOAL.HEIGHT / (this.goal.height || 1));
                                 this.tweens.add({
-                                    targets: [this.goalSwirl1, this.goalSwirl2, this.goalCore],
-                                    scaleX: 1.0,
-                                    scaleY: 1.0,
+                                    targets: this.goal,
+                                    scaleX: targetScaleX,
+                                    scaleY: targetScaleY,
                                     alpha: 1.0,
                                     duration: 280,
-                                    ease: 'Back.easeOut'
+                                    ease: 'Back.easeOut',
+                                    onComplete: () => {
+                                        if (this.goal) {
+                                            if (this.goal.body) this.goal.refreshBody();
+                                            this.goal.isTeleporting = false;
+                                        }
+                                    }
                                 });
                             }
-                        }
-                    });
+                        });
+                    }
                 }
             }
         }
